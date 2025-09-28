@@ -1,3 +1,4 @@
-discord.py
-facebook-scraper
-lxml_html_clean
+discord.py==2.4.0
+facebook-scraper==0.2.59
+lxml==5.3.0
+lxml_html_clean==0.1.1

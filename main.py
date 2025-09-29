@@ -25,14 +25,20 @@ def load_cookies():
 
 # ===== Requests + BeautifulSoup 抓取公開粉專 =====
 def fetch_bs_posts(page_id, cookies):
-    url = f"https://www.facebook.com/{page_id}/posts"
+    # 改用 ?sk=posts 強制顯示貼文
+    url = f"https://www.facebook.com/{page_id}?sk=posts&locale=zh_TW"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                       "AppleWebKit/537.36 (KHTML, like Gecko) "
                       "Chrome/117.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9"
+        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+        "Referer": "https://www.facebook.com/",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Dest": "document",
+        "Upgrade-Insecure-Requests": "1"
     }
-    resp = requests.get(url, headers=headers, cookies=cookies)
+    resp = requests.get(url, headers=headers, cookies=cookies, allow_redirects=True)
     if resp.status_code != 200:
         return None, f"HTTP {resp.status_code}"
     soup = BeautifulSoup(resp.text, "lxml")
@@ -47,7 +53,7 @@ def fetch_bs_posts(page_id, cookies):
 async def on_ready():
     channel = client.get_channel(DISCORD_CHANNEL_ID)
     if channel:
-        await channel.send("✅ Bot is online and ready for BeautifulSoup test!")
+        await channel.send("✅ Bot is online and ready for improved BeautifulSoup test!")
 
 @client.event
 async def on_message(message):

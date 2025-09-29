@@ -77,7 +77,7 @@ async def fetch_facebook_posts():
             except Exception as e:
                 print(f"❌ 抓取 {page} 失敗: {e}")
 
-        print("💤 本輪檢查結束，10 分鐘後再檢查")
+        print(" 本輪檢查結束，10 分鐘後再檢查")
         await asyncio.sleep(600)
 
 @client.event
@@ -100,7 +100,7 @@ async def fetch_facebook_posts():
     while not client.is_closed():
         for page in FB_PAGES:
             try:
-                add_log(f"🔎 正在檢查粉專: {page}")
+                add_log(f" 正在檢查粉專: {page}")
                 bot_status["last_check"] = f"正在檢查 {page}"
 
                 for post in get_posts(page, pages=1):
@@ -109,7 +109,7 @@ async def fetch_facebook_posts():
                     url = post.get("post_url", "")
 
                     if not post_id:
-                        add_log(f"⚠️ {page} 沒有抓到 post_id，可能是抓取失敗")...
+                        add_log(f" {page} 沒有抓到 post_id，可能是抓取失敗")...
 
 # ===== 啟動 Flask 假 Web Server =====
 keep_alive()

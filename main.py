@@ -7,6 +7,7 @@ from facebook_scraper import get_posts
 from keep_alive import keep_alive, bot_status, add_log
 
 intents = discord.Intents.default()
+intents.message_content = True  # 🔥 必須開啟
 client = discord.Client(intents=intents)
 
 DISCORD_CHANNEL_ID = 1047027221811970051  # 換成你的頻道 ID

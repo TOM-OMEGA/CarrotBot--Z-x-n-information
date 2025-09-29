@@ -205,7 +205,7 @@ async def on_message(message):
         for page in FB_PAGES:
             await fetch_page_posts(message.channel, page)
 
-    # 立即手動抓取指定粉專
+   # 立即手動抓取指定粉專
     elif content.lower().startswith("!fetch "):
         parts = content.split(" ", 1)
         if len(parts) == 2:
@@ -216,10 +216,49 @@ async def on_message(message):
     # 顯示目前設定的粉專清單
     elif content.lower() == "!listpages":
         pages_list = "\n".join([f"- {p}" for p in FB_PAGES])
-        await message.channel.send(f"📋 Current Facebook pages being
+        await message.channel.send(f"📋 Current Facebook pages being monitored:\n{pages_list}")
 
-# ===== Start Flask keep_alive =====
+    # 新增粉專
+    elif content.lower().startswith("!addpage "):
+        parts = content.split(" ", 1)
+        if len(parts) == 2:
+            page = parts[1].strip()
+            if page not in FB_PAGES:
+                FB_PAGES.append(page)
+                await message.channel.send(f"✅ Added page: {page}")
+                add_log(f"Page added: {page}")
+            else:
+                await message.channel.send(f"⚠️ Page {page} is already in the list.")
+
+    # 移除粉專
+    elif content.lower().startswith("!removepage "):
+        parts = content.split(" ", 1)
+        if len(parts) == 2:
+            page = parts[1].strip()
+            if page in FB_PAGES:
+                FB_PAGES.remove(page)
+                await message.channel.send(f"🗑️ Removed page: {page}")
+                add_log(f"Page removed: {page}")
+            else:
+                await message.channel.send(f"⚠️ Page {page} not found in the list.")
+
+    # 儲存粉專清單
+    elif content.lower() == "!savepages":
+        with open(PAGES_FILE, "w", encoding="utf-8") as f:
+            json.dump(FB_PAGES, f, ensure_ascii=False, indent=2)
+        await message.channel.send("💾 Pages list saved successfully.")
+        add_log("Pages list saved to file.")
+
+    # 載入粉專清單
+    elif content.lower() == "!loadpages":
+        if os.path.exists(PAGES_FILE):
+            with open(PAGES_FILE, "r", encoding="utf-8") as f:
+                FB_PAGES = json.load(f)
+            await message.channel.send("📂 Pages list loaded successfully.")
+            add_log("Pages list loaded from file.")
+        else:
+            await message.channel.send("⚠️ No saved pages file found.")
+
+# ===== 啟動 Flask + Discord Bot =====
 keep_alive()
-
-# ===== Start Discord Bot =====
 client.run(os.getenv("DISCORD_TOKEN"))

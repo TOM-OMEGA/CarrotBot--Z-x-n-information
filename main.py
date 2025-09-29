@@ -23,7 +23,7 @@ def load_cookies():
         print(f"❌ Failed to load cookies.json: {e}")
         return None
 
-# ===== Requests + BeautifulSoup 抓取公開粉專 =====
+# ===== 抓取 HTML =====
 def fetch_bs_html(page_id, cookies):
     url = f"https://www.facebook.com/{page_id}?sk=posts&locale=zh_TW"
     headers = {
@@ -42,11 +42,31 @@ def fetch_bs_html(page_id, cookies):
         return None, f"HTTP {resp.status_code}"
     return resp.text, None
 
+# ===== 解析貼文 =====
+def parse_posts(html):
+    soup = BeautifulSoup(html, "lxml")
+    posts = []
+
+    # 1. 嘗試新版 Facebook 結構
+    for div in soup.find_all("div", {"data-ad-preview": "message"}):
+        text = div.get_text(" ", strip=True)
+        if text:
+            posts.append(text[:200])
+
+    # 2. 備援：抓 span（避免漏掉）
+    if not posts:
+        for span in soup.find_all("span"):
+            text = span.get_text(" ", strip=True)
+            if len(text) > 30:  # 過濾掉太短的
+                posts.append(text[:200])
+
+    return posts
+
 @client.event
 async def on_ready():
     channel = client.get_channel(DISCORD_CHANNEL_ID)
     if channel:
-        await channel.send("✅ Bot is online and ready for BeautifulSoup raw HTML test!")
+        await channel.send("✅ Bot is online with improved parse_posts!")
 
 @client.event
 async def on_message(message):
@@ -55,7 +75,29 @@ async def on_message(message):
 
     content = message.content.strip()
 
-    # 新增指令：!bsraw <粉專ID>
+    # ===== !bsfetch <粉專ID> =====
+    if content.lower().startswith("!bsfetch "):
+        parts = content.split(" ", 1)
+        if len(parts) == 2:
+            page = parts[1].strip()
+            cookies = load_cookies()
+            if not cookies:
+                await message.channel.send("❌ Cannot load cookies.json")
+                return
+            html, error = fetch_bs_html(page, cookies)
+            if error:
+                await message.channel.send(f"❌ Error fetching {page}: {error}")
+            elif not html:
+                await message.channel.send(f"⚠️ No HTML fetched from {page}.")
+            else:
+                posts = parse_posts(html)
+                if not posts:
+                    await message.channel.send(f"⚠️ No posts parsed from {page}. Maybe blocked or HTML changed.")
+                else:
+                    preview = "\n".join([f"- {p}" for p in posts[:3]])
+                    await message.channel.send(f"✅ Parsed posts from {page}:\n{preview}")
+
+    # ===== !bsraw <粉專ID> =====
     if content.lower().startswith("!bsraw "):
         parts = content.split(" ", 1)
         if len(parts) == 2:
@@ -70,7 +112,7 @@ async def on_message(message):
             elif not html:
                 await message.channel.send(f"⚠️ No HTML fetched from {page}.")
             else:
-                snippet = html[:1000]  # 只取前 1000 字，避免超過 Discord 限制
+                snippet = html[:1000]
                 await message.channel.send(f"📄 Raw HTML from {page}:\n```html\n{snippet}\n```")
 
 # ===== 啟動 Flask + Discord Bot =====

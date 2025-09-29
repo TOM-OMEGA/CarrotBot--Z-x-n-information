@@ -3,17 +3,17 @@ import asyncio
 import discord
 import sqlite3
 from facebook_scraper import get_posts
-from keep_alive import keep_alive, bot_status
+from keep_alive import keep_alive, bot_status, add_log
 
 # ===== Discord Bot =====
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
-DISCORD_CHANNEL_ID = 1047027221811970051  # 換成你的頻道 ID
+DISCORD_CHANNEL_ID = 1047027221811970051  # replace with your channel ID
 FB_PAGES = ["appledaily.tw", "setnews.tw", "udn.com"]
 DB_FILE = "posts.db"
 
-# ===== SQLite 初始化 =====
+# ===== SQLite =====
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -36,22 +36,22 @@ def save_post(post_id):
     conn.commit()
     conn.close()
 
-# ===== 抓取多粉專貼文 =====
+# ===== Fetch Facebook posts =====
 async def fetch_facebook_posts():
     await client.wait_until_ready()
     channel = client.get_channel(DISCORD_CHANNEL_ID)
 
     if channel is None:
-        print("❌ 找不到指定的 Discord 頻道，請確認 DISCORD_CHANNEL_ID 是否正確")
+        add_log("ERROR: Cannot find the Discord channel. Check DISCORD_CHANNEL_ID.")
         return
 
-    print("✅ 背景任務已啟動，開始定期檢查粉專貼文...")
+    add_log("Background task started. Checking Facebook pages...")
 
     while not client.is_closed():
         for page in FB_PAGES:
             try:
-                print(f"🔎 正在檢查粉專: {page}")
-                bot_status["last_check"] = f"正在檢查 {page}"
+                add_log(f"Checking page: {page}")
+                bot_status["last_check"] = f"Checking {page}"
 
                 for post in get_posts(page, pages=1):
                     post_id = post.get("post_id")
@@ -59,60 +59,36 @@ async def fetch_facebook_posts():
                     url = post.get("post_url", "")
 
                     if not post_id:
-                        print(f"⚠️ {page} 沒有抓到 post_id，可能是抓取失敗")
+                        add_log(f"WARNING: {page} returned no post_id")
                         continue
 
-                    print(f"📌 抓到貼文 {post_id}，前50字: {text[:50]}...")
+                    add_log(f"Found post {post_id}, preview: {text[:50]}...")
 
                     if not is_post_sent(post_id):
                         save_post(post_id)
-                        msg = f"📢 {page} 新貼文：\n{text[:300]}...\n🔗 {url}"
+                        msg = f"[{page}] New post:\n{text[:300]}...\nLink: {url}"
                         await channel.send(msg)
                         bot_status["last_post"] = f"{page} {post_id}"
-                        print(f"✅ 已發送到 Discord 頻道 {channel.name}")
+                        add_log(f"Post {post_id} sent to Discord channel {channel.name}")
                     else:
-                        print(f"⏩ {page} 的貼文 {post_id} 已經發送過，跳過")
+                        add_log(f"Skipped {page} post {post_id}, already sent")
 
-                    break  # 只抓最新一篇
+                    break  # only latest post
             except Exception as e:
-                print(f"❌ 抓取 {page} 失敗: {e}")
+                add_log(f"ERROR: Failed to fetch {page}: {e}")
 
-        print(" 本輪檢查結束，10 分鐘後再檢查")
+        add_log("Cycle finished. Sleeping 10 minutes...")
         await asyncio.sleep(600)
 
 @client.event
 async def on_ready():
-    add_log(f"✅ 已登入 {client.user}")
+    add_log(f"Logged in as {client.user}")
     bot_status["logged_in"] = True
     init_db()
     client.loop.create_task(fetch_facebook_posts())
 
-async def fetch_facebook_posts():
-    await client.wait_until_ready()
-    channel = client.get_channel(DISCORD_CHANNEL_ID)
-
-    if channel is None:
-        add_log("❌ 找不到指定的 Discord 頻道，請確認 DISCORD_CHANNEL_ID 是否正確")
-        return
-
-    add_log("✅ 背景任務已啟動，開始定期檢查粉專貼文...")
-
-    while not client.is_closed():
-        for page in FB_PAGES:
-            try:
-                add_log(f" 正在檢查粉專: {page}")
-                bot_status["last_check"] = f"正在檢查 {page}"
-
-                for post in get_posts(page, pages=1):
-                    post_id = post.get("post_id")
-                    text = post.get("text", "")
-                    url = post.get("post_url", "")
-
-                    if not post_id:
-                        add_log(f" {page} 沒有抓到 post_id，可能是抓取失敗")...
-
-# ===== 啟動 Flask 假 Web Server =====
+# ===== Start Flask server =====
 keep_alive()
 
-# ===== 啟動 Bot =====
+# ===== Start Bot =====
 client.run(os.getenv("DISCORD_TOKEN"))

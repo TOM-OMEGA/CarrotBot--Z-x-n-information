@@ -45,11 +45,18 @@ def save_post(post_id):
     conn.commit()
     conn.close()
 
-# ===== Cookies loader =====
+# ===== Cookies loader (修正版) =====
 def load_cookies():
     try:
         with open("cookies.json", "r", encoding="utf-8") as f:
-            cookies = json.load(f)
+            data = json.load(f)
+        # 如果是 list of dicts，就轉成 {name: value}
+        if isinstance(data, list):
+            cookies = {item["name"]: item["value"] for item in data if "name" in item and "value" in item}
+        elif isinstance(data, dict):
+            cookies = data
+        else:
+            raise ValueError("Invalid cookies.json format")
         return cookies
     except Exception as e:
         add_log(f"❌ Failed to load cookies.json: {e}")
@@ -215,7 +222,7 @@ async def on_message(message):
         else:
             await message.channel.send("⚠️ Usage: `!setcheckinterval <seconds>`")
 
-   # 顯示目前設定
+    # 顯示目前設定
     elif content.lower() == "!showconfig":
         pages_list = "\n".join([f"- {p}" for p in FB_PAGES])
         msg = (

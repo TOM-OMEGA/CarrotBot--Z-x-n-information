@@ -14,6 +14,8 @@ PAGES_FILE = "pages.json"  # 儲存粉專清單的檔案
 DB_FILE = "posts.db"
 COOKIES_PATH = "cookies.json"
 
+posts = list(get_posts("appledaily.tw", pages=1, cookies=COOKIES_PATH))
+
 # ===== 載入粉專清單 =====
 if os.path.exists(PAGES_FILE):
     with open(PAGES_FILE, "r", encoding="utf-8") as f:

@@ -82,10 +82,34 @@ async def fetch_facebook_posts():
 
 @client.event
 async def on_ready():
-    print(f"✅ 已登入 {client.user}")
+    add_log(f"✅ 已登入 {client.user}")
     bot_status["logged_in"] = True
     init_db()
     client.loop.create_task(fetch_facebook_posts())
+
+async def fetch_facebook_posts():
+    await client.wait_until_ready()
+    channel = client.get_channel(DISCORD_CHANNEL_ID)
+
+    if channel is None:
+        add_log("❌ 找不到指定的 Discord 頻道，請確認 DISCORD_CHANNEL_ID 是否正確")
+        return
+
+    add_log("✅ 背景任務已啟動，開始定期檢查粉專貼文...")
+
+    while not client.is_closed():
+        for page in FB_PAGES:
+            try:
+                add_log(f"🔎 正在檢查粉專: {page}")
+                bot_status["last_check"] = f"正在檢查 {page}"
+
+                for post in get_posts(page, pages=1):
+                    post_id = post.get("post_id")
+                    text = post.get("text", "")
+                    url = post.get("post_url", "")
+
+                    if not post_id:
+                        add_log(f"⚠️ {page} 沒有抓到 post_id，可能是抓取失敗")...
 
 # ===== 啟動 Flask 假 Web Server =====
 keep_alive()

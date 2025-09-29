@@ -1,7 +1,8 @@
 import os
 import discord
 import json
-from facebook_scraper import get_posts
+import requests
+from bs4 import BeautifulSoup
 from keep_alive import keep_alive
 
 intents = discord.Intents.default()
@@ -15,23 +16,38 @@ def load_cookies():
     try:
         with open("cookies.json", "r", encoding="utf-8") as f:
             data = json.load(f)
-        # 轉成 {name: value}
         if isinstance(data, list):
-            cookies = {item["name"]: item["value"] for item in data if "name" in item and "value" in item}
-        elif isinstance(data, dict):
-            cookies = data
-        else:
-            raise ValueError("Invalid cookies.json format")
-        return cookies
+            return {item["name"]: item["value"] for item in data if "name" in item and "value" in item}
+        return data
     except Exception as e:
         print(f"❌ Failed to load cookies.json: {e}")
         return None
+
+# ===== Requests + BeautifulSoup 抓取公開粉專 =====
+def fetch_bs_posts(page_id, cookies):
+    url = f"https://www.facebook.com/{page_id}/posts"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/117.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+    }
+    resp = requests.get(url, headers=headers, cookies=cookies)
+    if resp.status_code != 200:
+        return None, f"HTTP {resp.status_code}"
+    soup = BeautifulSoup(resp.text, "lxml")
+    posts = []
+    for article in soup.find_all("div", {"role": "article"}):
+        text = article.get_text(" ", strip=True)
+        if text:
+            posts.append(text[:200])  # 只取前 200 字
+    return posts, None
 
 @client.event
 async def on_ready():
     channel = client.get_channel(DISCORD_CHANNEL_ID)
     if channel:
-        await channel.send("✅ Bot is online and ready for debug test!")
+        await channel.send("✅ Bot is online and ready for BeautifulSoup test!")
 
 @client.event
 async def on_message(message):
@@ -40,47 +56,23 @@ async def on_message(message):
 
     content = message.content.strip()
 
-    # 一鍵 debug
-    if content.lower() == "!debug":
-        cookies = load_cookies()
-        if not cookies:
-            await message.channel.send("❌ Cannot load cookies.json")
-            return
-
-        # 1. 測試 cookies 狀態
-        try:
-            posts = list(get_posts("appledaily.tw", pages=1, cookies=cookies))
-            if not posts:
-                await message.channel.send("⚠️ [Cookies] No posts fetched. Cookies may be expired or blocked.")
+    # 新增指令：!bsfetch <粉專ID>
+    if content.lower().startswith("!bsfetch "):
+        parts = content.split(" ", 1)
+        if len(parts) == 2:
+            page = parts[1].strip()
+            cookies = load_cookies()
+            if not cookies:
+                await message.channel.send("❌ Cannot load cookies.json")
+                return
+            posts, error = fetch_bs_posts(page, cookies)
+            if error:
+                await message.channel.send(f"❌ Error fetching {page}: {error}")
+            elif not posts:
+                await message.channel.send(f"⚠️ No posts parsed from {page}. Maybe blocked or HTML changed.")
             else:
-                post = posts[0]
-                await message.channel.send(f"✅ [Cookies] Valid. Latest post_id={post.get('post_id')}")
-        except Exception as e:
-            await message.channel.send(f"❌ [Cookies] Error: {e}")
-
-        # 2. 顯示 raw JSON
-        try:
-            posts = list(get_posts("appledaily.tw", pages=1, cookies=cookies))
-            if not posts:
-                await message.channel.send("⚠️ [Raw JSON] No data fetched.")
-            else:
-                post = posts[0]
-                raw_text = json.dumps(post, ensure_ascii=False, indent=2)[:1500]
-                await message.channel.send(f"📄 [Raw JSON]\n```json\n{raw_text}\n```")
-        except Exception as e:
-            await message.channel.send(f"❌ [Raw JSON] Error: {e}")
-
-        # 3. 顯示 raw HTML
-        try:
-            posts = get_posts("appledaily.tw", pages=1, cookies=cookies, options={"raw_html": True})
-            first = next(posts, None)
-            if not first or "html" not in first:
-                await message.channel.send("⚠️ [Raw HTML] No HTML fetched.")
-            else:
-                html_snippet = first["html"][:1500]
-                await message.channel.send(f"📄 [Raw HTML]\n```html\n{html_snippet}\n```")
-        except Exception as e:
-            await message.channel.send(f"❌ [Raw HTML] Error: {e}")
+                preview = "\n".join([f"- {p}" for p in posts[:3]])
+                await message.channel.send(f"✅ Parsed posts from {page}:\n{preview}")
 
 # ===== 啟動 Flask + Discord Bot =====
 keep_alive()

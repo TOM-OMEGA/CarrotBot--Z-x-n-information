@@ -40,6 +40,7 @@ def save_post(post_id):
 # ===== 抓取多粉專貼文 =====
 async def fetch_facebook_posts():
     await client.wait_until_ready()
+    print("開始抓取粉專...")
     channel = client.get_channel(DISCORD_CHANNEL_ID)
 
     while not client.is_closed():
@@ -64,18 +65,9 @@ async def on_ready():
     init_db()
     client.loop.create_task(fetch_facebook_posts())
 
-# ===== Flask 假 Web Server (給 Render + UptimeRobot) =====
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Bot is running!"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-
-Thread(target=run_flask).start()
-
 # ===== 啟動 Bot =====
-client.run(os.getenv("DISCORD_TOKEN"))
+from keep_alive import keep_alive   # ← 確保有這行
+keep_alive()                        # ← 啟動 Flask 假伺服器
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+client.run(TOKEN)

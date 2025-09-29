@@ -19,7 +19,7 @@ if os.path.exists(PAGES_FILE):
     with open(PAGES_FILE, "r", encoding="utf-8") as f:
         FB_PAGES = json.load(f)
 else:
-    FB_PAGES = ["appledaily.tw", "setnews.tw", "udn.com"]  # 預設清單
+    FB_PAGES = ["LARPtimes", "setnews.tw", "udn.com"]  # 預設清單
 
 # ===== SQLite =====
 def init_db():

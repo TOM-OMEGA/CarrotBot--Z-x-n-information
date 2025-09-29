@@ -217,16 +217,16 @@ async def on_message(message):
 
     # 顯示目前設定
     elif content.lower() == "!showconfig":
-        pages_list = "\n".join([f"- {p}" for p in FB_PAGES])
-        msg = (
-            "⚙️ **Current Bot Configuration**\n"
-            f"📋 Monitored Pages:\n{pages_list if pages_list else '（空）'}\n\n"
-            f"⏱️ Cookies Check Interval: {COOKIE_CHECK_INTERVAL} seconds\n"
-            f"🗄️ Database File: {DB_FILE}\n"
-            f"🍪 Cookies File: cookies.json\n"
-        )
-       await message.channel.send(msg)
-        add_log("Displayed current configuration.")
+    pages_list = "\n".join([f"- {p}" for p in FB_PAGES])
+    msg = (
+        "⚙️ **Current Bot Configuration**\n"
+        f"📋 Monitored Pages:\n{pages_list if pages_list else '（空）'}\n\n"
+        f"⏱️ Cookies Check Interval: {COOKIE_CHECK_INTERVAL} seconds\n"
+        f"🗄️ Database File: {DB_FILE}\n"
+        f"🍪 Cookies File: cookies.json\n"
+    )
+    await message.channel.send(msg)
+    add_log("Displayed current configuration.")
 
     # 立即手動抓取全部
     elif content.lower() == "!fetch":

@@ -216,7 +216,7 @@ async def on_message(message):
             await message.channel.send("⚠️ Usage: `!setcheckinterval <seconds>`")
 
    # 顯示目前設定
-    elif content.lower() == "!showconfig":
+   elif content.lower() == "!showconfig":
         pages_list = "\n".join([f"- {p}" for p in FB_PAGES])
         msg = (
             "⚙️ **Current Bot Configuration**\n"

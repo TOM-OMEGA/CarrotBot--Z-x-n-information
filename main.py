@@ -7,13 +7,12 @@ from facebook_scraper import get_posts
 from keep_alive import keep_alive, bot_status, add_log
 
 intents = discord.Intents.default()
-intents.message_content = True  # 🔥 必須開啟
+intents.message_content = True  # 必須開啟才能讀取訊息內容
 client = discord.Client(intents=intents)
 
 DISCORD_CHANNEL_ID = 1047027221811970051  # 換成你的頻道 ID
 PAGES_FILE = "pages.json"  # 儲存粉專清單的檔案
 DB_FILE = "posts.db"
-COOKIES_PATH = "cookies.json"
 COOKIE_CHECK_INTERVAL = 21600  # 預設 6 小時 (秒)
 
 # ===== 載入粉專清單 =====
@@ -21,7 +20,7 @@ if os.path.exists(PAGES_FILE):
     with open(PAGES_FILE, "r", encoding="utf-8") as f:
         FB_PAGES = json.load(f)
 else:
-    FB_PAGES = ["LARPtimes", "setnews.tw", "udn.com"]  # 預設清單
+    FB_PAGES = ["appledaily.tw", "setnews.tw", "udn.com"]  # 預設清單
 
 # ===== SQLite =====
 def init_db():
@@ -45,6 +44,16 @@ def save_post(post_id):
     c.execute("INSERT OR IGNORE INTO posts (post_id) VALUES (?)", (post_id,))
     conn.commit()
     conn.close()
+
+# ===== Cookies loader =====
+def load_cookies():
+    try:
+        with open("cookies.json", "r", encoding="utf-8") as f:
+            cookies = json.load(f)
+        return cookies
+    except Exception as e:
+        add_log(f"❌ Failed to load cookies.json: {e}")
+        return None
 
 # ===== Background Task: 抓取貼文 =====
 async def fetch_facebook_posts():
@@ -71,8 +80,14 @@ async def periodic_cookie_check():
     channel = client.get_channel(DISCORD_CHANNEL_ID)
 
     while not client.is_closed():
+        cookies = load_cookies()
+        if not cookies:
+            await channel.send("❌ Cannot load cookies.json")
+            await asyncio.sleep(COOKIE_CHECK_INTERVAL)
+            continue
+
         try:
-            posts = list(get_posts("appledaily.tw", pages=1, cookies=COOKIES_PATH))
+            posts = list(get_posts("appledaily.tw", pages=1, cookies=cookies))
             if not posts:
                 await channel.send("⚠️ Scheduled check: No posts fetched. Cookies may be expired.")
                 add_log("⚠️ Scheduled cookies check failed.")
@@ -88,11 +103,16 @@ async def periodic_cookie_check():
 
 # ===== Helper: 抓取單一粉專 =====
 async def fetch_page_posts(channel, page):
+    cookies = load_cookies()
+    if not cookies:
+        await channel.send("❌ Cannot load cookies.json")
+        return
+
     try:
         add_log(f"Checking page: {page}")
         bot_status["last_check"] = f"Checking {page}"
 
-        posts = list(get_posts(page, pages=1, cookies=COOKIES_PATH))
+        posts = list(get_posts(page, pages=1, cookies=cookies))
 
         if not posts:
             add_log(f"⚠️ No posts fetched from {page}. Possible cookies expired.")
@@ -136,18 +156,22 @@ async def on_ready():
         add_log("Test message sent to Discord.")
 
         # 🚀 啟動時自動檢查 cookies
-        try:
-            posts = list(get_posts("appledaily.tw", pages=1, cookies=COOKIES_PATH))
-            if not posts:
-                await channel.send("⚠️ Cookies check failed: No posts fetched. Cookies may be expired.")
-                add_log("⚠️ Cookies check failed at startup.")
-            else:
-                post = posts[0]
-                await channel.send(f"✅ Cookies check success at startup. Latest post_id={post.get('post_id')}")
-                add_log(f"✅ Cookies check success at startup. Got post_id={post.get('post_id')}")
-        except Exception as e:
-            await channel.send(f"❌ Cookies check error at startup: {e}")
-            add_log(f"❌ Cookies check error at startup: {e}")
+        cookies = load_cookies()
+        if not cookies:
+            await channel.send("❌ Cannot load cookies.json")
+        else:
+            try:
+                posts = list(get_posts("appledaily.tw", pages=1, cookies=cookies))
+                if not posts:
+                    await channel.send("⚠️ Cookies check failed: No posts fetched. Cookies may be expired.")
+                    add_log("⚠️ Cookies check failed at startup.")
+                else:
+                    post = posts[0]
+                    await channel.send(f"✅ Cookies check success at startup. Latest post_id={post.get('post_id')}")
+                    add_log(f"✅ Cookies check success at startup. Got post_id={post.get('post_id')}")
+            except Exception as e:
+                await channel.send(f"❌ Cookies check error at startup: {e}")
+                add_log(f"❌ Cookies check error at startup: {e}")
 
     else:
         add_log("❌ Channel not found. Check DISCORD_CHANNEL_ID.")
@@ -167,8 +191,12 @@ async def on_message(message):
 
     # 檢查 cookies 狀態
     if content.lower() == "!checkcookies":
+        cookies = load_cookies()
+        if not cookies:
+            await message.channel.send("❌ Cannot load cookies.json")
+            return
         try:
-            posts = list(get_posts("appledaily.tw", pages=1, cookies=COOKIES_PATH))
+            posts = list(get_posts("appledaily.tw", pages=1, cookies=cookies))
             if not posts:
                 await message.channel.send("⚠️ No posts fetched. Cookies may be expired.")
             else:
@@ -195,9 +223,9 @@ async def on_message(message):
             f"📋 Monitored Pages:\n{pages_list if pages_list else '（空）'}\n\n"
             f"⏱️ Cookies Check Interval: {COOKIE_CHECK_INTERVAL} seconds\n"
             f"🗄️ Database File: {DB_FILE}\n"
-            f"🍪 Cookies File: {COOKIES_PATH}\n"
+            f"🍪 Cookies File: cookies.json\n"
         )
-        await message.channel.send(msg)
+       await message.channel.send(msg)
         add_log("Displayed current configuration.")
 
     # 立即手動抓取全部
@@ -206,7 +234,7 @@ async def on_message(message):
         for page in FB_PAGES:
             await fetch_page_posts(message.channel, page)
 
-   # 立即手動抓取指定粉專
+    # 立即手動抓取指定粉專
     elif content.lower().startswith("!fetch "):
         parts = content.split(" ", 1)
         if len(parts) == 2:

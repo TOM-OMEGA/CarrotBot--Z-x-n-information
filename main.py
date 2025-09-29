@@ -9,7 +9,7 @@ from keep_alive import keep_alive, bot_status, add_log
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
-DISCORD_CHANNEL_ID = 1047027221811970051  # replace with your channel ID
+DISCORD_CHANNEL_ID = 1047027221811970051  # 換成你的頻道 ID
 FB_PAGES = ["appledaily.tw", "setnews.tw", "udn.com"]
 DB_FILE = "posts.db"
 
@@ -42,10 +42,12 @@ async def fetch_facebook_posts():
     channel = client.get_channel(DISCORD_CHANNEL_ID)
 
     if channel is None:
-        add_log("ERROR: Cannot find the Discord channel. Check DISCORD_CHANNEL_ID.")
+        add_log("❌ Cannot find the Discord channel.")
         return
 
-    add_log("Background task started. Checking Facebook pages...")
+    add_log("✅ Background task started.")
+    # 測試訊息：確認背景任務真的有跑
+    await channel.send("🔔 Background task is running!")
 
     while not client.is_closed():
         for page in FB_PAGES:
@@ -85,6 +87,14 @@ async def on_ready():
     add_log(f"Logged in as {client.user}")
     bot_status["logged_in"] = True
     init_db()
+
+    channel = client.get_channel(DISCORD_CHANNEL_ID)
+    if channel:
+        await channel.send("✅ Bot is online and ready!")  # 測試訊息
+        add_log("Test message sent to Discord.")
+    else:
+        add_log("❌ Channel not found. Check DISCORD_CHANNEL_ID.")
+
     client.loop.create_task(fetch_facebook_posts())
 
 # ===== Start Flask server =====

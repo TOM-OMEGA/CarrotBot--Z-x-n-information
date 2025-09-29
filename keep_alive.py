@@ -2,17 +2,28 @@ from flask import Flask, request
 from threading import Thread
 import os
 
+# 狀態字典，main.py 會更新
+bot_status = {
+    "logged_in": False,
+    "last_check": "尚未檢查",
+    "last_post": "尚未發送"
+}
+
 app = Flask(__name__)
 
-# 支援 GET 與 HEAD，讓 UptimeRobot 免費方案能正常判斷
 @app.route("/", methods=["GET", "HEAD"])
 def home():
-    print(f"Ping received: {request.method}")  # Debug log，方便在 Render Logs 看到
     return "Bot is alive!", 200
 
+@app.route("/status", methods=["GET"])
+def status():
+    return {
+        "bot_logged_in": bot_status["logged_in"],
+        "last_check": bot_status["last_check"],
+        "last_post": bot_status["last_post"]
+    }, 200
+
 def run():
-    # Render 會自動提供 PORT 環境變數，預設 fallback 8080
-  
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 

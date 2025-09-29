@@ -13,6 +13,7 @@ DISCORD_CHANNEL_ID = 1047027221811970051  # 換成你的頻道 ID
 PAGES_FILE = "pages.json"  # 儲存粉專清單的檔案
 DB_FILE = "posts.db"
 COOKIES_PATH = "cookies.json"
+COOKIE_CHECK_INTERVAL = 21600  # 預設 6 小時 (秒)
 
 # ===== 載入粉專清單 =====
 if os.path.exists(PAGES_FILE):
@@ -44,7 +45,7 @@ def save_post(post_id):
     conn.commit()
     conn.close()
 
-# ===== Background Task =====
+# ===== Background Task: 抓取貼文 =====
 async def fetch_facebook_posts():
     await client.wait_until_ready()
     channel = client.get_channel(DISCORD_CHANNEL_ID)
@@ -62,7 +63,29 @@ async def fetch_facebook_posts():
         add_log("Cycle finished. Sleeping 10 minutes...")
         await asyncio.sleep(600)
 
-# ===== Helper: Fetch one page =====
+# ===== Background Task: 定時檢查 cookies =====
+async def periodic_cookie_check():
+    global COOKIE_CHECK_INTERVAL
+    await client.wait_until_ready()
+    channel = client.get_channel(DISCORD_CHANNEL_ID)
+
+    while not client.is_closed():
+        try:
+            posts = list(get_posts("appledaily.tw", pages=1, cookies=COOKIES_PATH))
+            if not posts:
+                await channel.send("⚠️ Scheduled check: No posts fetched. Cookies may be expired.")
+                add_log("⚠️ Scheduled cookies check failed.")
+            else:
+                post = posts[0]
+                await channel.send(f"✅ Scheduled cookies check success. Latest post_id={post.get('post_id')}")
+                add_log(f"✅ Scheduled cookies check success. Got post_id={post.get('post_id')}")
+        except Exception as e:
+            await channel.send(f"❌ Scheduled cookies check error: {e}")
+            add_log(f"❌ Scheduled cookies check error: {e}")
+
+        await asyncio.sleep(COOKIE_CHECK_INTERVAL)
+
+# ===== Helper: 抓取單一粉專 =====
 async def fetch_page_posts(channel, page):
     try:
         add_log(f"Checking page: {page}")
@@ -110,15 +133,32 @@ async def on_ready():
     if channel:
         await channel.send("✅ Bot is online and ready!")
         add_log("Test message sent to Discord.")
+
+        # 🚀 啟動時自動檢查 cookies
+        try:
+            posts = list(get_posts("appledaily.tw", pages=1, cookies=COOKIES_PATH))
+            if not posts:
+                await channel.send("⚠️ Cookies check failed: No posts fetched. Cookies may be expired.")
+                add_log("⚠️ Cookies check failed at startup.")
+            else:
+                post = posts[0]
+                await channel.send(f"✅ Cookies check success at startup. Latest post_id={post.get('post_id')}")
+                add_log(f"✅ Cookies check success at startup. Got post_id={post.get('post_id')}")
+        except Exception as e:
+            await channel.send(f"❌ Cookies check error at startup: {e}")
+            add_log(f"❌ Cookies check error at startup: {e}")
+
     else:
         add_log("❌ Channel not found. Check DISCORD_CHANNEL_ID.")
 
+    # 啟動背景任務
     client.loop.create_task(fetch_facebook_posts())
+    client.loop.create_task(periodic_cookie_check())
 
 # ===== Discord Commands =====
 @client.event
 async def on_message(message):
-    global FB_PAGES
+    global FB_PAGES, COOKIE_CHECK_INTERVAL
     if message.author == client.user:
         return
 
@@ -135,6 +175,29 @@ async def on_message(message):
                 await message.channel.send(f"✅ Cookies valid. Latest post_id={post.get('post_id')}")
         except Exception as e:
             await message.channel.send(f"❌ Cookies check error: {e}")
+
+    # 設定 cookies 檢查間隔
+    elif content.lower().startswith("!setcheckinterval "):
+        parts = content.split(" ", 1)
+        if len(parts) == 2 and parts[1].isdigit():
+            COOKIE_CHECK_INTERVAL = int(parts[1])
+            await message.channel.send(f"⏱️ Cookies check interval updated to {COOKIE_CHECK_INTERVAL} seconds.")
+            add_log(f"Cookies check interval updated to {COOKIE_CHECK_INTERVAL} seconds.")
+        else:
+            await message.channel.send("⚠️ Usage: `!setcheckinterval <seconds>`")
+
+    # 顯示目前設定
+    elif content.lower() == "!showconfig":
+        pages_list = "\n".join([f"- {p}" for p in FB_PAGES])
+        msg = (
+            "⚙️ **Current Bot Configuration**\n"
+            f"📋 Monitored Pages:\n{pages_list if pages_list else '（空）'}\n\n"
+            f"⏱️ Cookies Check Interval: {COOKIE_CHECK_INTERVAL} seconds\n"
+            f"🗄️ Database File: {DB_FILE}\n"
+            f"🍪 Cookies File: {COOKIES_PATH}\n"
+        )
+        await message.channel.send(msg)
+        add_log("Displayed current configuration.")
 
     # 立即手動抓取全部
     elif content.lower() == "!fetch":
@@ -153,48 +216,7 @@ async def on_message(message):
     # 顯示目前設定的粉專清單
     elif content.lower() == "!listpages":
         pages_list = "\n".join([f"- {p}" for p in FB_PAGES])
-        await message.channel.send(f"📋 Current Facebook pages being monitored:\n{pages_list}")
-
-    # 新增粉專
-    elif content.lower().startswith("!addpage "):
-        parts = content.split(" ", 1)
-        if len(parts) == 2:
-            page = parts[1].strip()
-            if page not in FB_PAGES:
-                FB_PAGES.append(page)
-                await message.channel.send(f"✅ Added page: {page}")
-                add_log(f"Page added: {page}")
-            else:
-                await message.channel.send(f"⚠️ Page {page} is already in the list.")
-
-    # 移除粉專
-    elif content.lower().startswith("!removepage "):
-        parts = content.split(" ", 1)
-        if len(parts) == 2:
-            page = parts[1].strip()
-            if page in FB_PAGES:
-                FB_PAGES.remove(page)
-                await message.channel.send(f"🗑️ Removed page: {page}")
-                add_log(f"Page removed: {page}")
-            else:
-                await message.channel.send(f"⚠️ Page {page} not found in the list.")
-
-    # 儲存粉專清單
-    elif content.lower() == "!savepages":
-        with open(PAGES_FILE, "w", encoding="utf-8") as f:
-            json.dump(FB_PAGES, f, ensure_ascii=False, indent=2)
-        await message.channel.send("💾 Pages list saved successfully.")
-        add_log("Pages list saved to file.")
-
-    # 載入粉專清單
-    elif content.lower() == "!loadpages":
-        if os.path.exists(PAGES_FILE):
-            with open(PAGES_FILE, "r", encoding="utf-8") as f:
-                FB_PAGES = json.load(f)
-            await message.channel.send("📂 Pages list loaded successfully.")
-            add_log("Pages list loaded from file.")
-        else:
-            await message.channel.send("⚠️ No saved pages file found.")
+        await message.channel.send(f"📋 Current Facebook pages being
 
 # ===== Start Flask keep_alive =====
 keep_alive()

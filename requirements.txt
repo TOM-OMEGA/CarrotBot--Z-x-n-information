@@ -1,4 +1,4 @@
-facebook-scraper
+facebook-scraper==0.2.59
 requests
 flask
 lxml==4.9.3

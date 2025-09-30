@@ -1,4 +1,3 @@
-facebook-scraper==0.2.59
 requests
 flask
 beautifulsoup4

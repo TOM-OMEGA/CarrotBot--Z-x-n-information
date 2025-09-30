@@ -49,7 +49,7 @@ def send_to_discord(content):
 
 def run_once():
     print("🔎 開始抓取 Facebook 貼文...", flush=True)
-    for post in get_posts(PAGE_NAME, pages=1, cookies=None):
+    for post in get_posts(PAGE_NAME, pages=1, options={"parser": "html.parser"}):  # 強制用 html.parser
         post_id = str(post['post_id'])
         text = post.get("text", "")
         preview = text[:200] + "..." if len(text) > 200 else text

@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: fb-to-discord-bot
-    env: docker
-    dockerfilePath: ./Dockerfile
-    envVars:
-      - key: DISCORD_TOKEN
-        sync: false

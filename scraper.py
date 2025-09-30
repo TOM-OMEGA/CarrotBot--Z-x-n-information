@@ -57,6 +57,11 @@ def run_once():
     posts = fetch_posts()
     print(f"🔎 抓到 {len(posts)} 篇文章", flush=True)
 
+    if len(posts) == 0:
+        # 如果抓不到文章，送一則測試訊息
+        send_to_discord("⚠️ 測試訊息：目前抓不到文章，Webhook 正常")
+        return
+
     for post in posts[:5]:
         post_id = post.get("data-ft")
         if not post_id:

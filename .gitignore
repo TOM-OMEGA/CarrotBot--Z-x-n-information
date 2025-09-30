@@ -1,9 +1,4 @@
-# Python cache
 __pycache__/
 *.pyc
-
-# 爬蟲紀錄檔
-posted.json
-
-# 環境設定
+posts.db
 .env

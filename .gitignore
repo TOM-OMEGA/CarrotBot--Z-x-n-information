@@ -1,22 +1,9 @@
-# Python 編譯檔案
+# Python cache
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
 
-# 虛擬環境
-.venv/
-env/
-venv/
+# 爬蟲紀錄檔
+posted.json
 
-# 本地設定檔
-*.env
-
-# 敏感檔案
-cookies.json
-pages.json
-posts.db
-
-# Render / 部署暫存檔
-*.log
-*.sqlite3
+# 環境設定
+.env

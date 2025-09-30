@@ -58,7 +58,6 @@ def run_once():
     print(f"🔎 抓到 {len(posts)} 篇文章", flush=True)
 
     if len(posts) == 0:
-        # 如果抓不到文章，送一則測試訊息
         send_to_discord("⚠️ 測試訊息：目前抓不到文章，Webhook 正常")
         return
 
@@ -90,8 +89,17 @@ def health():
 def history():
     return jsonify(get_all_posts())
 
+# 新增 /test endpoint
+@app.route("/test", methods=["GET"])
+def test():
+    send_to_discord("🧪 測試訊息：Webhook 正常運作！")
+    return jsonify({"status": "ok", "message": "已送出測試訊息到 Discord"})
+
 if __name__ == "__main__":
     init_db()
+
+    # 啟動時立即送一則訊息
+    send_to_discord("🚀 Bot 已啟動，Webhook 正常！")
 
     def loop_scraper():
         while True:

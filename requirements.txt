@@ -1,5 +1,4 @@
 facebook-scraper==0.2.59
 requests
 flask
-lxml==4.9.3
-lxml_html_clean
+beautifulsoup4

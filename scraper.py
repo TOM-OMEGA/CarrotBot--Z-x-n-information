@@ -1,27 +1,49 @@
 import requests
 from bs4 import BeautifulSoup
-import json
 import os
 import time
-from flask import Flask, Response
+import sqlite3
+from flask import Flask, Response, jsonify
+import threading
+from datetime import datetime
 
-# Flask app for health check
+# Flask app
 app = Flask(__name__)
 
 PAGE_URL = "https://www.facebook.com/appledaily.tw/posts"
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-HISTORY_FILE = "posted.json"
 INTERVAL = int(os.getenv("SCRAPER_INTERVAL", 10800))  # 預設 3 小時
+DB_FILE = "posts.db"
 
-def load_history():
-    if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            return set(json.load(f))
-    return set()
+# 初始化 SQLite
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS posts (
+            id TEXT PRIMARY KEY,
+            content TEXT,
+            created_at TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-def save_history(history):
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(list(history), f, ensure_ascii=False, indent=2)
+def save_post(post_id, content):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO posts (id, content, created_at) VALUES (?, ?, ?)",
+              (post_id, content, datetime.utcnow().isoformat()))
+    conn.commit()
+    conn.close()
+
+def get_all_posts(limit=20):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT id, content, created_at FROM posts ORDER BY created_at DESC LIMIT ?", (limit,))
+    rows = c.fetchall()
+    conn.close()
+    return [{"id": r[0], "content": r[1], "created_at": r[2]} for r in rows]
 
 def fetch_posts():
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -37,36 +59,42 @@ def send_to_discord(content):
     requests.post(WEBHOOK_URL, json=payload)
 
 def run_once():
-    history = load_history()
     posts = fetch_posts()
-    new_ids = []
+    print(f"🔎 抓到 {len(posts)} 篇文章")
 
     for post in posts[:5]:
         post_id = post.get("data-ft")
         if not post_id:
             continue
-        if post_id not in history:
+
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT 1 FROM posts WHERE id=?", (post_id,))
+        exists = c.fetchone()
+        conn.close()
+
+        if not exists:
             text = post.get_text(separator="\n", strip=True)
             preview = text[:200] + "..." if len(text) > 200 else text
             send_to_discord(f"📢 新貼文：\n{preview}")
-            new_ids.append(post_id)
+            save_post(post_id, preview)
+            print(f"✅ 推送新貼文 {post_id}")
+        else:
+            print(f"⏭ 已存在 {post_id}")
 
-    if new_ids:
-        history.update(new_ids)
-        save_history(history)
-        print(f"✅ 推送 {len(new_ids)} 篇新貼文")
-    else:
-        print("ℹ️ 沒有新貼文")
-
-# Flask health check endpoint
+# Flask endpoints
 @app.route("/health", methods=["GET", "HEAD"])
 def health():
     return Response("OK", status=200)
 
-if __name__ == "__main__":
-    import threading
+@app.route("/history", methods=["GET"])
+def history():
+    posts = get_all_posts()
+    return jsonify(posts)
 
-    # 爬蟲背景執行緒
+if __name__ == "__main__":
+    init_db()
+
     def loop_scraper():
         while True:
             run_once()
@@ -76,6 +104,5 @@ if __name__ == "__main__":
     t = threading.Thread(target=loop_scraper, daemon=True)
     t.start()
 
-    # 啟動 Flask server (Render 會自動分配 PORT)
     port = int(os.getenv("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

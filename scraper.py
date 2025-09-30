@@ -7,7 +7,6 @@ from flask import Flask, Response, jsonify
 import threading
 from datetime import datetime
 
-# Flask app
 app = Flask(__name__)
 
 PAGE_URL = "https://www.facebook.com/appledaily.tw/posts"
@@ -48,6 +47,7 @@ def get_all_posts(limit=20):
 def fetch_posts():
     headers = {"User-Agent": "Mozilla/5.0"}
     res = requests.get(PAGE_URL, headers=headers)
+    print(f"🌐 抓取頁面狀態碼: {res.status_code}")
     soup = BeautifulSoup(res.text, "html.parser")
     return soup.find_all("div", {"role": "article"})
 
@@ -65,6 +65,8 @@ def run_once():
 
     for post in posts[:5]:
         post_id = post.get("data-ft")
+        print("➡️ 找到文章 ID:", post_id)
+
         if not post_id:
             continue
 
@@ -77,13 +79,13 @@ def run_once():
         if not exists:
             text = post.get_text(separator="\n", strip=True)
             preview = text[:200] + "..." if len(text) > 200 else text
+            print(f"📝 準備推送內容: {preview[:50]}...")
             send_to_discord(f"📢 新貼文：\n{preview}")
             save_post(post_id, preview)
             print(f"✅ 推送新貼文 {post_id}")
         else:
             print(f"⏭ 已存在 {post_id}")
 
-# Flask endpoints
 @app.route("/health", methods=["GET", "HEAD"])
 def health():
     return Response("OK", status=200)

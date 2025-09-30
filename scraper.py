@@ -1,5 +1,5 @@
-from facebook_scraper import get_posts
-import os, time, sqlite3, threading, requests
+import requests, os, time, sqlite3, threading
+from bs4 import BeautifulSoup
 from flask import Flask, Response, jsonify
 from datetime import datetime
 
@@ -8,9 +8,8 @@ app = Flask(__name__)
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 INTERVAL = int(os.getenv("SCRAPER_INTERVAL", 3600))  # 預設 1 小時
 DB_FILE = "posts.db"
-PAGE_NAME = "appledaily.tw"  # 粉專 ID 或名稱
+PAGE_URL = "https://www.facebook.com/appledaily.tw/posts"
 
-# 初始化 SQLite
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -47,12 +46,21 @@ def send_to_discord(content):
     r = requests.post(WEBHOOK_URL, json={"content": content})
     print(f"📡 Discord 回應: {r.status_code} {r.text}", flush=True)
 
+def fetch_posts():
+    headers = {"User-Agent": "Mozilla/5.0"}
+    res = requests.get(PAGE_URL, headers=headers)
+    print(f"🌐 抓取頁面狀態碼: {res.status_code}", flush=True)
+    soup = BeautifulSoup(res.text, "html.parser")
+    return soup.find_all("div", {"role": "article"})
+
 def run_once():
-    print("🔎 開始抓取 Facebook 貼文...", flush=True)
-    for post in get_posts(PAGE_NAME, pages=1, options={"parser": "html.parser"}):  # 強制用 html.parser
-        post_id = str(post['post_id'])
-        text = post.get("text", "")
-        preview = text[:200] + "..." if len(text) > 200 else text
+    posts = fetch_posts()
+    print(f"🔎 抓到 {len(posts)} 篇文章", flush=True)
+
+    for post in posts[:5]:
+        post_id = post.get("data-ft")
+        if not post_id:
+            continue
 
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
@@ -61,6 +69,8 @@ def run_once():
         conn.close()
 
         if not exists:
+            text = post.get_text(separator="\n", strip=True)
+            preview = text[:200] + "..." if len(text) > 200 else text
             send_to_discord(f"📢 新貼文：\n{preview}")
             save_post(post_id, preview)
             print(f"✅ 推送新貼文 {post_id}", flush=True)

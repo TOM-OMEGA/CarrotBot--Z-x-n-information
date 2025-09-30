@@ -56,7 +56,8 @@ def send_to_discord(content):
         print("❌ 沒有設定 DISCORD_WEBHOOK_URL")
         return
     payload = {"content": content}
-    requests.post(WEBHOOK_URL, json=payload)
+    r = requests.post(WEBHOOK_URL, json=payload)
+    print(f"📡 Discord 回應: {r.status_code} {r.text}")
 
 def run_once():
     posts = fetch_posts()

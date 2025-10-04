@@ -40,7 +40,13 @@ def get_all_posts(limit=20):
     conn.close()
     return [{"id": r[0], "content": r[1], "created_at": r[2]} for r in rows]
 
-def run_scraper(selector='div[data-testid="post_message"]'):
+def run_scraper():
+    selectors = [
+        'div[data-testid="post_message"]',
+        'div[data-ad-preview="message"]',
+        'div[data-pagelet^="FeedUnit_"]',
+        'div[role="article"]'
+    ]
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(storage_state="fb_state.json")
@@ -48,17 +54,23 @@ def run_scraper(selector='div[data-testid="post_message"]'):
         page.goto("https://www.facebook.com/appledaily.tw/posts")
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(5000)
-        try:
-            page.wait_for_selector(selector, timeout=10000)
-        except:
-            print(f"⚠️ 貼文容器 {selector} 未出現")
-        articles = page.query_selector_all(selector)
-        for a in articles[:3]:
-            text = a.inner_text()
-            post_id = a.get_attribute("data-ft") or str(hash(text))
-            preview = text[:200] + "..." if len(text) > 200 else text
-            send_to_discord(f"📢 新貼文：\n{preview}")
-            save_post(post_id, preview)
+
+        for selector in selectors:
+            try:
+                page.wait_for_selector(selector, timeout=8000)
+                articles = page.query_selector_all(selector)
+                if articles:
+                    print(f"✅ 使用 selector：{selector}，找到 {len(articles)} 篇貼文")
+                    for a in articles[:3]:
+                        text = a.inner_text()
+                        post_id = a.get_attribute("data-ft") or str(hash(text))
+                        preview = text[:200] + "..." if len(text) > 200 else text
+                        send_to_discord(f"📢 新貼文：\n{preview}")
+                        save_post(post_id, preview)
+                    return
+            except:
+                print(f"⚠️ selector 超時或無結果：{selector}")
+        print("❌ 所有 selector 都失敗，未找到貼文")
 
 @app.route("/run")
 def run():
@@ -105,8 +117,8 @@ def debug():
             html = page.content()
             result["html_length"] = len(html)
             result["contains_article_div"] = (
-                'data-testid="post_message"' in html or
                 'data-ad-preview="message"' in html or
+                'data-testid="post_message"' in html or
                 'FeedUnit_' in html
             )
     except Exception as e:
@@ -134,6 +146,40 @@ def selector_test():
             })
     except Exception as e:
         return jsonify({"error": str(e), "selector": selector})
+
+@app.route("/selector-test-fallback")
+def selector_test_fallback():
+    selectors = [
+        'div[data-testid="post_message"]',
+        'div[data-ad-preview="message"]',
+        'div[data-pagelet^="FeedUnit_"]',
+        'div[role="article"]'
+    ]
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(storage_state="fb_state.json")
+            page = context.new_page()
+            page.goto("https://www.facebook.com/appledaily.tw/posts")
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(5000)
+
+            for selector in selectors:
+                try:
+                    page.wait_for_selector(selector, timeout=8000)
+                    elements = page.query_selector_all(selector)
+                    if elements:
+                        previews = [e.inner_text()[:100] for e in elements[:5]]
+                        return jsonify({
+                            "selector": selector,
+                            "count": len(elements),
+                            "previews": previews
+                        })
+                except:
+                    continue
+            return jsonify({"error": "所有 selector 都失敗"})
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route("/health")
 def health():

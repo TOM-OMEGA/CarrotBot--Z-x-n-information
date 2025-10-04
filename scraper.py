@@ -8,7 +8,13 @@ app = Flask(__name__)
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 INTERVAL = int(os.getenv("SCRAPER_INTERVAL", 3600))  # 預設 1 小時
 DB_FILE = "posts.db"
-PAGE_URL = "https://www.facebook.com/LARPtimes"
+PAGE_URL = "https://www.facebook.com/appledaily.tw/posts"
+
+# 從環境變數讀取 Facebook Cookie
+COOKIES = {
+    "c_user": os.getenv("FB_C_USER"),
+    "xs": os.getenv("FB_XS")
+}
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -48,7 +54,7 @@ def send_to_discord(content):
 
 def fetch_posts():
     headers = {"User-Agent": "Mozilla/5.0"}
-    res = requests.get(PAGE_URL, headers=headers)
+    res = requests.get(PAGE_URL, headers=headers, cookies=COOKIES)
     print(f"🌐 抓取頁面狀態碼: {res.status_code}", flush=True)
     soup = BeautifulSoup(res.text, "html.parser")
     return soup.find_all("div", {"role": "article"})
@@ -89,7 +95,6 @@ def health():
 def history():
     return jsonify(get_all_posts())
 
-# 新增 /test endpoint
 @app.route("/test", methods=["GET"])
 def test():
     send_to_discord("🧪 測試訊息：Webhook 正常運作！")
@@ -97,8 +102,6 @@ def test():
 
 if __name__ == "__main__":
     init_db()
-
-    # 啟動時立即送一則訊息
     send_to_discord("🚀 Bot 已啟動，Webhook 正常！")
 
     def loop_scraper():

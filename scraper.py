@@ -8,7 +8,7 @@ app = Flask(__name__)
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 INTERVAL = int(os.getenv("SCRAPER_INTERVAL", 3600))
 DB_FILE = "posts.db"
-PAGE_URL = "https://www.facebook.com/appledaily.tw/posts"
+PAGE_URL = "https://www.facebook.com/LARPtimes"
 
 # 從環境變數讀取整組 cookie（JSON 格式）
 try:

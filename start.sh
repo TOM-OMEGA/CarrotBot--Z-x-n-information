@@ -1,4 +1,5 @@
 #!/bin/bash
+export PLAYWRIGHT_BROWSERS_PATH=0
 playwright install
-pip install flask
+python login_once.py
 python fb_scraper.py

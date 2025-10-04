@@ -45,10 +45,9 @@ def run_scraper():
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(storage_state="fb_state.json")
         page = context.new_page()
-
-        page.goto("https://www.facebook.com/LARPtimes")
-        page.wait_for_selector('div[role="article"]', timeout=10000)
-        articles = page.query_selector_all('div[role="article"]')
+        page.goto("https://www.facebook.com/appledaily.tw/posts")
+        page.wait_for_timeout(5000)
+        articles = page.query_selector_all('div[data-pagelet^="FeedUnit_"]')
         for a in articles[:3]:
             text = a.inner_text()
             post_id = a.get_attribute("data-ft") or str(hash(text))
@@ -56,26 +55,52 @@ def run_scraper():
             send_to_discord(f"📢 新貼文：\n{preview}")
             save_post(post_id, preview)
 
-@app.route("/run", methods=["GET"])
+@app.route("/run")
 def run():
-    run_scraper()
-    return Response("✅ 執行完成", status=200)
+    try:
+        run_scraper()
+        return Response("✅ 執行完成", status=200)
+    except Exception as e:
+        return Response(f"❌ 執行錯誤：{str(e)}", status=500)
 
-@app.route("/preview", methods=["GET"])
+@app.route("/preview")
 def preview():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(storage_state="fb_state.json")
-        page = context.new_page()
-        page.goto("https://www.facebook.com/appledaily.tw/posts")
-        html = page.content()
-        return Response(html[:3000], mimetype="text/plain")
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(storage_state="fb_state.json")
+            page = context.new_page()
+            page.goto("https://www.facebook.com/appledaily.tw/posts")
+            html = page.content()
+            return Response(html[:3000], mimetype="text/plain")
+    except Exception as e:
+        return Response(f"❌ 錯誤：{str(e)}", status=500)
 
-@app.route("/history", methods=["GET"])
+@app.route("/history")
 def history():
     return jsonify(get_all_posts())
 
-@app.route("/health", methods=["GET"])
+@app.route("/debug")
+def debug():
+    result = {}
+    try:
+        result["fb_state_exists"] = os.path.exists("fb_state.json")
+        result["env_FB_EMAIL"] = bool(os.getenv("FB_EMAIL"))
+        result["env_FB_PASSWORD"] = bool(os.getenv("FB_PASSWORD"))
+        result["env_DISCORD_WEBHOOK_URL"] = bool(os.getenv("DISCORD_WEBHOOK_URL"))
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(storage_state="fb_state.json")
+            page = context.new_page()
+            page.goto("https://www.facebook.com/appledaily.tw/posts")
+            html = page.content()
+            result["html_length"] = len(html)
+            result["contains_article_div"] = 'role="article"' in html or 'FeedUnit_' in html
+    except Exception as e:
+        result["error"] = str(e)
+    return jsonify(result)
+
+@app.route("/health")
 def health():
     return Response("OK", status=200)
 

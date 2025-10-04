@@ -46,7 +46,7 @@ def run_scraper():
         context = browser.new_context(storage_state="fb_state.json")
         page = context.new_page()
 
-        page.goto("https://www.facebook.com/appledaily.tw/posts")
+        page.goto("https://www.facebook.com/LARPtimes")
         page.wait_for_selector('div[role="article"]', timeout=10000)
         articles = page.query_selector_all('div[role="article"]')
         for a in articles[:3]:

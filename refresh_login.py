@@ -10,7 +10,7 @@ def refresh_fb_login():
         return
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)  # Render 上建議 headless=True
         context = browser.new_context()
         page = context.new_page()
 

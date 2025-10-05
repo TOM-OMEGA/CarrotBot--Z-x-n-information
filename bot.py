@@ -79,7 +79,11 @@ async def fbcheck(ctx):
     await ctx.send("🧪 正在執行系統診斷...")
     try:
         r1 = requests.get(f"{API_URL}/status", timeout=15)
+    try:
         data = r1.json()
+    except Exception as e:
+        await ctx.send(f"❌ 無法解析 /status 回應：{r1.text[:200]}")
+        return
         if "error" in data:
             await ctx.send(f"❌ 狀態錯誤：{data['error']}")
         else:

@@ -257,7 +257,6 @@ def debug_login():
             context.close()
             browser.close()
 
-        # 將圖片轉成 base64 傳回
         with open(screenshot_path, "rb") as f:
             encoded = base64.b64encode(f.read()).decode("utf-8")
         return jsonify({"image_base64": encoded})
@@ -265,5 +264,8 @@ def debug_login():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+# ✅ 合併主程式區塊
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    init_db()
+    port = int(os.getenv("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)

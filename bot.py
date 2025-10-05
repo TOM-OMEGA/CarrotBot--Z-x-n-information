@@ -55,4 +55,17 @@ async def on_message(message):
         except Exception as e:
             await message.channel.send(f"⚠️ 錯誤：{str(e)}")
 
+    elif message.content == "/debuglogin":
+        await message.channel.send("🧪 正在擷取 Facebook 登入畫面...")
+        try:
+            r = requests.get(f"{API_URL}/debug-login", timeout=30)
+            data = r.json()
+            if "image_base64" in data:
+                await message.channel.send("📷 登入畫面已擷取（請使用 base64 工具還原）")
+                await message.channel.send(data["image_base64"][:1000] + "...")
+            else:
+                await message.channel.send(f"❌ 錯誤：{data.get('error', '未知錯誤')}")
+        except Exception as e:
+            await message.channel.send(f"⚠️ 錯誤：{str(e)}")
+
 client.run(TOKEN)

@@ -297,6 +297,10 @@ def upload_cookie():
     except Exception as e:
         return f"❌ 儲存失敗：{str(e)}"
 
+@app.route("/routes", methods=["GET"])
+def list_routes():
+    return "\n".join([str(rule) for rule in app.url_map.iter_rules()])
+
 # ✅ 合併主程式區塊
 if __name__ == "__main__":
     init_db()

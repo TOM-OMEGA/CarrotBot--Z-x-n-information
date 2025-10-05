@@ -78,12 +78,15 @@ async def debuglogin(ctx):
 async def fbcheck(ctx):
     await ctx.send("🧪 正在執行系統診斷...")
     try:
+        # 呼叫 /status
         r1 = requests.get(f"{API_URL}/status", timeout=15)
-    try:
-        data = r1.json()
-    except Exception as e:
-        await ctx.send(f"❌ 無法解析 /status 回應：{r1.text[:200]}")
-        return
+        try:
+            data = r1.json()
+        except Exception as e:
+            await ctx.send(f"❌ 無法解析 /status 回應：{r1.text[:200]}")
+            return
+
+        # 分析 /status 回應
         if "error" in data:
             await ctx.send(f"❌ 狀態錯誤：{data['error']}")
         else:
@@ -97,6 +100,7 @@ async def fbcheck(ctx):
             )
             await ctx.send(msg)
 
+        # 呼叫 /debug-login
         r2 = requests.get(f"{API_URL}/debug-login", timeout=30)
         data2 = r2.json()
         if "image_base64" in data2:
@@ -108,7 +112,7 @@ async def fbcheck(ctx):
             await ctx.send(f"❌ 登入畫面錯誤：{data2.get('error', '未知錯誤')}")
     except Exception as e:
         await ctx.send(f"⚠️ 系統診斷失敗：{str(e)}")
-
+        
 # 📦 !fbhelp：顯示所有指令與用途說明
 @client.command()
 async def fbhelp(ctx):

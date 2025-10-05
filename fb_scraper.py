@@ -284,6 +284,19 @@ def status():
 def index():
     return "✅ FB爬蟲助手已啟動"
 
+@app.route("/upload-cookie", methods=["POST"])
+def upload_cookie():
+    file = request.files.get("file")
+    if not file:
+        return "❌ 未收到檔案"
+    if file.filename != "fb_state.json":
+        return "⚠️ 檔名必須為 fb_state.json"
+    try:
+        file.save("fb_state.json")
+        return "✅ Cookie 已更新"
+    except Exception as e:
+        return f"❌ 儲存失敗：{str(e)}"
+
 # ✅ 合併主程式區塊
 if __name__ == "__main__":
     init_db()

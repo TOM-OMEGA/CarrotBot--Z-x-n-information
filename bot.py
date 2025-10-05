@@ -129,7 +129,23 @@ async def fbview(ctx):
     else:
         await ctx.send("⚠️ 尚未擷取登入錯誤畫面，請先執行 login_once.py 或使用 !debuglogin")
 
+@client.command()
+async def fbupload(ctx):
+    if not ctx.message.attachments:
+        await ctx.send("❌ 請附加 fb_state.json 檔案")
+        return
 
+    attachment = ctx.message.attachments[0]
+    if attachment.filename != "fb_state.json":
+        await ctx.send("⚠️ 檔名必須為 fb_state.json")
+        return
+
+    try:
+        file_bytes = await attachment.read()
+        r = requests.post(f"{API_URL}/upload-cookie", files={"file": ("fb_state.json", file_bytes)})
+        await ctx.send(r.text)
+    except Exception as e:
+        await ctx.send(f"❌ 上傳失敗：{str(e)}")
 
         
 # 📦 !fbhelp：顯示所有指令與用途說明
@@ -144,6 +160,7 @@ async def fbhelp(ctx):
         "`!fbcheck` → 一鍵診斷系統狀態與登入畫面\n"
         "`!fbraw` → 顯示 /status 原始回應內容\n"
         "`!fbview` → 回傳登入錯誤畫面 login_error.png\n"
+        "`!fbupload` → 上傳登入 cookie（fb_state.json）\n"
         "`!fbhelp` → 顯示所有指令與用途說明"
     )
     await ctx.send(help_msg)

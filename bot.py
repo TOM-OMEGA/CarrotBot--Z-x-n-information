@@ -112,6 +112,25 @@ async def fbcheck(ctx):
             await ctx.send(f"❌ 登入畫面錯誤：{data2.get('error', '未知錯誤')}")
     except Exception as e:
         await ctx.send(f"⚠️ 系統診斷失敗：{str(e)}")
+
+@client.command()
+async def fbraw(ctx):
+    await ctx.send("📡 正在擷取 /status 原始回應...")
+    try:
+        r = requests.get(f"{API_URL}/status", timeout=15)
+        await ctx.send(f"```{r.text[:1500]}```")
+    except Exception as e:
+        await ctx.send(f"⚠️ 錯誤：{str(e)}")
+
+@client.command()
+async def fbview(ctx):
+    if os.path.exists("login_error.png"):
+        await ctx.send(file=discord.File("login_error.png"))
+    else:
+        await ctx.send("⚠️ 尚未擷取登入錯誤畫面，請先執行 login_once.py 或使用 !debuglogin")
+
+
+
         
 # 📦 !fbhelp：顯示所有指令與用途說明
 @client.command()
@@ -123,6 +142,8 @@ async def fbhelp(ctx):
         "`!fbrun` → 執行爬蟲並推送貼文\n"
         "`!debuglogin` → 擷取 Facebook 登入畫面\n"
         "`!fbcheck` → 一鍵診斷系統狀態與登入畫面\n"
+        "`!fbraw` → 顯示 /status 原始回應內容\n"
+        "`!fbview` → 回傳登入錯誤畫面 login_error.png\n"
         "`!fbhelp` → 顯示所有指令與用途說明"
     )
     await ctx.send(help_msg)

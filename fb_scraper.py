@@ -228,3 +228,13 @@ if __name__ == "__main__":
     init_db()
     port = int(os.getenv("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+from refresh_login import refresh_fb_login
+
+@app.route("/refresh-login")
+def refresh_login():
+    try:
+        refresh_fb_login()
+        return Response("✅ 登入已更新", status=200)
+    except Exception as e:
+        return Response(f"❌ 登入失敗：{str(e)}", status=500)

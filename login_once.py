@@ -1,36 +1,22 @@
 from playwright.sync_api import sync_playwright
-import os
+import json
 
-email = os.getenv("FB_EMAIL")
-password = os.getenv("FB_PASSWORD")
+def login_and_save_cookie():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)  # ✅ GUI 模式，可手動通過驗證
+        context = browser.new_context()
+        page = context.new_page()
 
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)
-    context = browser.new_context()
-    page = context.new_page()
-    page.goto("https://www.facebook.com/login", timeout=30000)
-    page.wait_for_selector("input[name='email']", timeout=10000)
-    page.fill("input[name='email']", email)
-    page.fill("input[name='pass']", password)
+        print("🔐 請手動登入 Facebook，通過驗證後關閉分頁即可")
+        page.goto("https://www.facebook.com/login")
 
-    try:
-        page.wait_for_selector("text=Log In", timeout=10000)
-        page.click("text=Log In", timeout=5000)
-    except Exception as e:
-        print(f"❌ 登入按鈕點擊失敗：{e}")
-        page.screenshot(path="login_click_error.png")
-        raise e
+        input("⏳ 登入完成後請按 Enter 繼續儲存 cookie...")
 
-    page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(3000)
-
-    if "login" in page.url or "checkpoint" in page.url:
-        print("❌ 登入失敗，可能需要驗證或帳密錯誤")
-        page.screenshot(path="login_error.png")
-    else:
+        # ✅ 儲存登入狀態
         context.storage_state(path="fb_state.json")
-        print("✅ 登入成功，已更新 fb_state.json")
+        print("✅ 登入狀態已儲存至 fb_state.json")
 
-    page.close()
-    context.close()
-    browser.close()
+        browser.close()
+
+if __name__ == "__main__":
+    login_and_save_cookie()

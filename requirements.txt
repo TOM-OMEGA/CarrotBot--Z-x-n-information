@@ -1,3 +1,5 @@
 playwright
 requests
 flask
+python-dotenv
+discord.py

@@ -47,8 +47,8 @@ def expand_see_more(page):
     for keyword in keywords:
         try:
             locators = page.locator(f'xpath=//*[contains(text(), "{keyword}")]')
-            count = locators.count()
-            print(f"🔍 嘗試展開「{keyword}」：找到 {count} 個元素")
+            count = min(locators.count(), 10)
+            print(f"🔍 嘗試展開「{keyword}」：最多展開 {count} 個")
             for i in range(count):
                 try:
                     locators.nth(i).click(timeout=1000)
@@ -88,18 +88,12 @@ def run_scraper():
                         preview = text[:200] + "..." if len(text) > 200 else text
                         send_to_discord(f"📢 新貼文：\n{preview}")
                         save_post(post_id, preview)
-                    return
+                    break
             except:
                 print(f"⚠️ selector 超時或無結果：{selector}")
-        print("❌ 所有 selector 都失敗，未找到貼文")
-
-@app.route("/run")
-def run():
-    try:
-        run_scraper()
-        return Response("✅ 執行完成", status=200)
-    except Exception as e:
-        return Response(f"❌ 執行錯誤：{str(e)}", status=500)
+        page.close()
+        context.close()
+        browser.close()
 
 @app.route("/preview")
 def preview():
@@ -113,9 +107,21 @@ def preview():
             page.wait_for_timeout(5000)
             expand_see_more(page)
             html = page.content()
-            return Response(html[:3000], mimetype="text/plain")
+            page.close()
+            context.close()
+            browser.close()
+            return Response(html[:1000], mimetype="text/plain")
     except Exception as e:
         return Response(f"❌ 錯誤：{str(e)}", status=500)
+
+
+@app.route("/run")
+def run():
+    try:
+        run_scraper()
+        return Response("✅ 執行完成", status=200)
+    except Exception as e:
+        return Response(f"❌ 執行錯誤：{str(e)}", status=500)
 
 @app.route("/history")
 def history():

@@ -40,6 +40,26 @@ def get_all_posts(limit=20):
     conn.close()
     return [{"id": r[0], "content": r[1], "created_at": r[2]} for r in rows]
 
+def expand_see_more(page):
+    page.wait_for_timeout(2000)
+    keywords = ["see more", "顯示更多", "查看更多"]
+    expanded = 0
+    for keyword in keywords:
+        try:
+            locators = page.locator(f'xpath=//*[contains(text(), "{keyword}")]')
+            count = locators.count()
+            print(f"🔍 嘗試展開「{keyword}」：找到 {count} 個元素")
+            for i in range(count):
+                try:
+                    locators.nth(i).click(timeout=1000)
+                    page.wait_for_timeout(500)
+                    expanded += 1
+                except Exception as e:
+                    print(f"⚠️ 點擊失敗：{e}")
+        except Exception as e:
+            print(f"⚠️ 無法搜尋「{keyword}」：{e}")
+    print(f"✅ 展開成功 {expanded} 個貼文")
+
 def run_scraper():
     selectors = [
         'div[data-testid="post_message"]',
@@ -54,6 +74,7 @@ def run_scraper():
         page.goto("https://www.facebook.com/appledaily.tw/posts")
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(5000)
+        expand_see_more(page)
 
         for selector in selectors:
             try:
@@ -90,6 +111,7 @@ def preview():
             page.goto("https://www.facebook.com/appledaily.tw/posts")
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(5000)
+            expand_see_more(page)
             html = page.content()
             return Response(html[:3000], mimetype="text/plain")
     except Exception as e:
@@ -114,6 +136,7 @@ def debug():
             page.goto("https://www.facebook.com/appledaily.tw/posts")
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(5000)
+            expand_see_more(page)
             html = page.content()
             result["html_length"] = len(html)
             result["contains_article_div"] = (
@@ -136,6 +159,7 @@ def selector_test():
             page.goto("https://www.facebook.com/appledaily.tw/posts")
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(5000)
+            expand_see_more(page)
             page.wait_for_selector(selector, timeout=10000)
             elements = page.query_selector_all(selector)
             previews = [e.inner_text()[:100] for e in elements[:5]]
@@ -163,6 +187,7 @@ def selector_test_fallback():
             page.goto("https://www.facebook.com/appledaily.tw/posts")
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(5000)
+            expand_see_more(page)
 
             for selector in selectors:
                 try:

@@ -264,6 +264,24 @@ def debug_login():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+@app.route("/status")
+def status():
+    try:
+        result = {
+            "fb_state_exists": os.path.exists("fb_state.json"),
+            "env_FB_EMAIL": bool(os.getenv("FB_EMAIL")),
+            "env_FB_PASSWORD": bool(os.getenv("FB_PASSWORD")),
+            "env_DISCORD_WEBHOOK_URL": bool(os.getenv("DISCORD_WEBHOOK_URL")),
+            "recent_posts": get_all_posts(limit=5)
+        }
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route("/")
+def index():
+    return "✅ FB爬蟲助手已啟動"
+
 # ✅ 合併主程式區塊
 if __name__ == "__main__":
     init_db()

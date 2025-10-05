@@ -266,6 +266,7 @@ def debug_login():
 
 @app.route("/status")
 def status():
+    print("📡 收到 /status 請求")
     try:
         result = {
             "fb_state_exists": os.path.exists("fb_state.json"),
@@ -276,6 +277,7 @@ def status():
         }
         return jsonify(result)
     except Exception as e:
+        print(f"❌ /status 發生錯誤：{e}")
         return jsonify({"error": str(e)})
 
 @app.route("/")

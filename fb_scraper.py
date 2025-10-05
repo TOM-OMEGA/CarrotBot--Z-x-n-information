@@ -238,3 +238,29 @@ def refresh_login():
         return Response("✅ 登入已更新", status=200)
     except Exception as e:
         return Response(f"❌ 登入失敗：{str(e)}", status=500)
+
+@app.route("/debug-login")
+def debug_login():
+    try:
+        from playwright.sync_api import sync_playwright
+        import base64
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context()
+            page = context.new_page()
+            page.goto("https://www.facebook.com/login", timeout=30000)
+            page.wait_for_timeout(3000)
+            screenshot_path = "login_debug.png"
+            page.screenshot(path=screenshot_path)
+            page.close()
+            context.close()
+            browser.close()
+
+        # 將圖片轉成 base64 傳回
+        with open(screenshot_path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode("utf-8")
+        return jsonify({"image_base64": encoded})
+
+    except Exception as e:
+        return jsonify({"error": str(e)})

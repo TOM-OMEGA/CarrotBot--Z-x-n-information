@@ -47,7 +47,7 @@ def expand_see_more(page):
     for keyword in keywords:
         try:
             locators = page.locator(f'xpath=//*[contains(text(), "{keyword}")]')
-            count = min(locators.count(), 10)
+            count = min(locators.count(), 5)  # 限制最多展開 5 個
             print(f"🔍 嘗試展開「{keyword}」：最多展開 {count} 個")
             for i in range(count):
                 try:
@@ -82,7 +82,7 @@ def run_scraper():
                 articles = page.query_selector_all(selector)
                 if articles:
                     print(f"✅ 使用 selector：{selector}，找到 {len(articles)} 篇貼文")
-                    for a in articles[:3]:
+                    for a in articles[:3]:  # 最多處理 3 篇
                         text = a.inner_text()
                         post_id = a.get_attribute("data-ft") or str(hash(text))
                         preview = text[:200] + "..." if len(text) > 200 else text
@@ -95,6 +95,14 @@ def run_scraper():
         context.close()
         browser.close()
 
+@app.route("/run")
+def run():
+    try:
+        run_scraper()
+        return Response("✅ 執行完成", status=200)
+    except Exception as e:
+        return Response(f"❌ 執行錯誤：{str(e)}", status=500)
+
 @app.route("/preview")
 def preview():
     try:
@@ -104,24 +112,15 @@ def preview():
             page = context.new_page()
             page.goto("https://www.facebook.com/appledaily.tw/posts")
             page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(5000)
-            expand_see_more(page)
-            html = page.content()
+            page.wait_for_timeout(3000)
+            title = page.title()
+            url = page.url
             page.close()
             context.close()
             browser.close()
-            return Response(html[:1000], mimetype="text/plain")
+            return jsonify({"title": title, "url": url})
     except Exception as e:
         return Response(f"❌ 錯誤：{str(e)}", status=500)
-
-
-@app.route("/run")
-def run():
-    try:
-        run_scraper()
-        return Response("✅ 執行完成", status=200)
-    except Exception as e:
-        return Response(f"❌ 執行錯誤：{str(e)}", status=500)
 
 @app.route("/history")
 def history():
@@ -141,8 +140,7 @@ def debug():
             page = context.new_page()
             page.goto("https://www.facebook.com/appledaily.tw/posts")
             page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(5000)
-            expand_see_more(page)
+            page.wait_for_timeout(3000)
             html = page.content()
             result["html_length"] = len(html)
             result["contains_article_div"] = (
@@ -150,6 +148,9 @@ def debug():
                 'data-testid="post_message"' in html or
                 'FeedUnit_' in html
             )
+            page.close()
+            context.close()
+            browser.close()
     except Exception as e:
         result["error"] = str(e)
     return jsonify(result)
@@ -164,11 +165,13 @@ def selector_test():
             page = context.new_page()
             page.goto("https://www.facebook.com/appledaily.tw/posts")
             page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(5000)
-            expand_see_more(page)
+            page.wait_for_timeout(3000)
             page.wait_for_selector(selector, timeout=10000)
             elements = page.query_selector_all(selector)
             previews = [e.inner_text()[:100] for e in elements[:5]]
+            page.close()
+            context.close()
+            browser.close()
             return jsonify({
                 "selector": selector,
                 "count": len(elements),
@@ -192,8 +195,7 @@ def selector_test_fallback():
             page = context.new_page()
             page.goto("https://www.facebook.com/appledaily.tw/posts")
             page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(5000)
-            expand_see_more(page)
+            page.wait_for_timeout(3000)
 
             for selector in selectors:
                 try:
@@ -201,6 +203,9 @@ def selector_test_fallback():
                     elements = page.query_selector_all(selector)
                     if elements:
                         previews = [e.inner_text()[:100] for e in elements[:5]]
+                        page.close()
+                        context.close()
+                        browser.close()
                         return jsonify({
                             "selector": selector,
                             "count": len(elements),
@@ -208,6 +213,9 @@ def selector_test_fallback():
                         })
                 except:
                     continue
+            page.close()
+            context.close()
+            browser.close()
             return jsonify({"error": "所有 selector 都失敗"})
     except Exception as e:
         return jsonify({"error": str(e)})

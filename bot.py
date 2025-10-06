@@ -165,25 +165,6 @@ async def fbclear(ctx):
         await ctx.send(f"⚠️ 清除失敗：{str(e)}")
 
 @client.command()
-async def fbupload(ctx):
-    if not ctx.message.attachments:
-        await ctx.send("❌ 請附加 fb_state.json 檔案")
-        return
-
-    attachment = ctx.message.attachments[0]
-    if attachment.filename != "fb_state.json":
-        await ctx.send("⚠️ 檔名必須為 fb_state.json")
-        return
-
-    try:
-        file_bytes = await attachment.read()
-        r = requests.post(f"{API_URL}/upload-cookie", files={"file": ("fb_state.json", file_bytes)})
-        await ctx.send(r.text)
-        await ctx.send(f"伺服器回應：{r.status_code} → {r.text}")
-    except Exception as e:
-        await ctx.send(f"❌ 上傳失敗：{str(e)}")
-
-@client.command()
 async def fbpanel(ctx):
     await ctx.send("📊 正在載入系統面板...")
     try:

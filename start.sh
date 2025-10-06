@@ -1,20 +1,19 @@
 #!/bin/bash
 
-echo "🚀 start.sh 已執行"  # ← 放這裡，最早輸出
-
-# ✅ 設定 Playwright 安裝路徑（Render 支援）
-export PLAYWRIGHT_BROWSERS_PATH=0
+echo "🚀 start.sh 已執行"
 
 # ✅ 安裝 Playwright Chromium（Render 無頭環境）
+export PLAYWRIGHT_BROWSERS_PATH=0
 playwright install chromium
 
-# ⚠️ Render 無法執行 GUI 登入，略過 login_once.py
-echo "⚠️ Render 無法執行 login_once.py，請在本機登入後上傳 cookie"
+# ✅ 顯示目前目錄與檔案
+echo "📂 目前目錄內容："
+ls -l
 
-# ✅ 背景啟動 Discord Bot（保持在線）
+# ✅ 背景啟動 Discord Bot
 echo "✅ 啟動 Discord Bot 中..."
 python bot.py &
 
-# ✅ 啟動 Flask 主程式（Render 主進程）
+# ✅ 啟動 Flask 主程式
 echo "✅ 啟動 Flask 主程式中..."
 python fb_scraper.py

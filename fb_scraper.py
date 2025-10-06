@@ -31,19 +31,42 @@ def send_to_discord(content):
 
 # === SQLite 初始化 ===
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS posts (
-            id TEXT PRIMARY KEY,
-            content TEXT,
-            created_at TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS posts (
+                id TEXT PRIMARY KEY,
+                content TEXT,
+                created_at TEXT
+            )
+        """)
+        conn.commit()
+        conn.close()
+        print("✅ 資料庫初始化完成或已存在")
+    except Exception as e:
+        print(f"⚠️ 初始化資料庫失敗：{e}")
+
+def ensure_db():
+    """自動檢查資料庫是否存在，不存在就建立"""
+    if not os.path.exists(DB_FILE):
+        print("📦 偵測到 posts.db 不存在，正在建立中...")
+        init_db()
+    else:
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'")
+            if not c.fetchone():
+                print("📦 偵測到資料表不存在，重新建立中...")
+                init_db()
+            conn.close()
+        except Exception as e:
+            print(f"⚠️ 資料庫檢查錯誤：{e}")
+            init_db()
 
 def save_post(post_id, content):
+    ensure_db()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("INSERT OR IGNORE INTO posts (id, content, created_at) VALUES (?, ?, ?)",
@@ -52,6 +75,7 @@ def save_post(post_id, content):
     conn.close()
 
 def get_all_posts(limit=20):
+    ensure_db()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT id, content, created_at FROM posts ORDER BY created_at DESC LIMIT ?", (limit,))
@@ -73,6 +97,7 @@ def expand_see_more(page):
 
 def run_scraper():
     app.logger.info("🚀 開始執行爬蟲...")
+    ensure_db()
     if not os.path.exists("fb_state.json"):
         raise FileNotFoundError("❌ 缺少 fb_state.json，請先上傳或設定 FB_STATE_JSON")
 
@@ -105,7 +130,7 @@ def run_scraper():
         page = context.new_page()
 
         try:
-            page.goto("https://www.facebook.com/LARPtimes", timeout=45000)
+            page.goto("https://www.facebook.com/appledaily.tw/posts", timeout=45000)
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(2000)
             expand_see_more(page)
@@ -159,6 +184,7 @@ def run():
 @app.route("/status")
 def status():
     try:
+        ensure_db()
         return jsonify({
             "fb_state_exists": os.path.exists("fb_state.json"),
             "env_FB_EMAIL": bool(os.getenv("FB_EMAIL")),
@@ -169,13 +195,13 @@ def status():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-@app.route("/refresh-login")
-def refresh_login():
+@app.route("/init-db")
+def init_database():
     try:
-        refresh_fb_login()
-        return Response("✅ 登入已更新", status=200)
+        init_db()
+        return "✅ 資料庫初始化完成"
     except Exception as e:
-        return Response(f"❌ 登入失敗：{str(e)}", status=500)
+        return f"❌ 初始化失敗：{e}"
 
 @app.route("/upload-cookie", methods=["POST"])
 def upload_cookie():
@@ -201,8 +227,8 @@ def health():
 # === 啟動伺服器 ===
 if __name__ == "__main__":
     print("✅ Flask 啟動中：fb_scraper.py")
+    ensure_db()  # 確保資料庫存在
     for rule in app.url_map.iter_rules():
         print(f" - {rule}")
-    init_db()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)

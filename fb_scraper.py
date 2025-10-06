@@ -72,7 +72,7 @@ def run_scraper():
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(storage_state="fb_state.json")
         page = context.new_page()
-        page.goto("https://www.facebook.com/appledaily.tw/posts", timeout=60000)
+        page.goto("https://www.facebook.com/LARPtimes", timeout=60000)
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(3000)
         expand_see_more(page)

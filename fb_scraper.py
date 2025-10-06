@@ -105,7 +105,8 @@ def run_scraper():
         'div[data-testid="post_message"]',
         'div[data-ad-preview="message"]',
         'div[data-pagelet^="FeedUnit_"]',
-        'div[role="article"]'
+        'div[role="article"]',
+        'div[role="article"] span[dir="auto"]'
     ]
 
     with sync_playwright() as p:
@@ -130,9 +131,10 @@ def run_scraper():
         page = context.new_page()
 
         try:
-            page.goto("https://www.facebook.com/appledaily.tw/posts", timeout=45000)
+            # ⚙️ 修改為你要爬的粉專
+            page.goto("https://www.facebook.com/appledaily.tw/posts", timeout=60000)
             page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(8000)
             expand_see_more(page)
 
             found_any = False
@@ -143,9 +145,23 @@ def run_scraper():
                     if articles:
                         found_any = True
                         for a in articles[:3]:
-                            text = a.inner_text()
-                            post_id = a.get_attribute("data-ft") or str(hash(text))
-                            preview = text[:200] + "..." if len(text) > 200 else text
+                            text = a.inner_text().strip()
+                            img_src = ""
+                            try:
+                                img = a.query_selector("img")
+                                if img:
+                                    img_src = img.get_attribute("src") or ""
+                            except:
+                                pass
+
+                            if not text and img_src:
+                                preview = f"🖼️ 圖片貼文：{img_src}"
+                            elif text:
+                                preview = text[:200] + "..." if len(text) > 200 else text
+                            else:
+                                preview = "⚠️ 無法解析貼文內容"
+
+                            post_id = a.get_attribute("data-ft") or str(hash(preview))
                             send_to_discord(f"📢 新貼文：\n{preview}")
                             save_post(post_id, preview)
                         break

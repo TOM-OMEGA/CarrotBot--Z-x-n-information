@@ -60,7 +60,7 @@ async def fbstatus(ctx):
 async def fbrun(ctx):
     await ctx.send("🚀 正在執行爬蟲...")
     try:
-        r = requests.get(f"{API_URL}/run", timeout=60)
+        r = requests.get(f"{API_URL}/run", timeout=180)
         await ctx.send(r.text)
     except Exception as e:
         await ctx.send(f"⚠️ 錯誤：{str(e)}")

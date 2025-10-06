@@ -226,4 +226,5 @@ async def fbhelp(ctx):
     await ctx.send(help_msg)
 
 # ✅ 啟動 Bot
-client.run(TOKEN)
+if __name__ == "__main__":
+    client.run(TOKEN)

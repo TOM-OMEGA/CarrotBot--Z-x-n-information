@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-import os, requests, sqlite3, base64
+import os, requests, sqlite3, base64, threading
 from flask import Flask, Response, jsonify, request
 from datetime import datetime
 from refresh_login import refresh_fb_login
@@ -11,7 +11,10 @@ app = Flask(__name__)
 # === Discord 推送功能 ===
 def send_to_discord(content):
     if WEBHOOK_URL:
-        requests.post(WEBHOOK_URL, json={"content": content})
+        try:
+            requests.post(WEBHOOK_URL, json={"content": content})
+        except Exception as e:
+            app.logger.error(f"❌ Discord Webhook 錯誤：{e}")
 
 # === SQLite 初始化 ===
 def init_db():
@@ -30,7 +33,8 @@ def init_db():
 def save_post(post_id, content):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO posts (id, content, created_at) VALUES (?, ?, ?)", (post_id, content, datetime.utcnow().isoformat()))
+    c.execute("INSERT OR IGNORE INTO posts (id, content, created_at) VALUES (?, ?, ?)",
+              (post_id, content, datetime.utcnow().isoformat()))
     conn.commit()
     conn.close()
 
@@ -44,19 +48,20 @@ def get_all_posts(limit=20):
 
 # === 主要爬蟲 ===
 def expand_see_more(page):
-    page.wait_for_timeout(2000)
+    page.wait_for_timeout(1500)
     keywords = ["see more", "顯示更多", "查看更多"]
     for keyword in keywords:
         try:
             locators = page.locator(f'xpath=//*[contains(text(), "{keyword}")]')
             count = min(locators.count(), 5)
             for i in range(count):
-                locators.nth(i).click(timeout=1000)
-                page.wait_for_timeout(500)
+                locators.nth(i).click(timeout=800)
+                page.wait_for_timeout(300)
         except:
             pass
 
 def run_scraper():
+    app.logger.info("🚀 開始執行爬蟲...")
     selectors = [
         'div[data-testid="post_message"]',
         'div[data-ad-preview="message"]',
@@ -67,16 +72,18 @@ def run_scraper():
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(storage_state="fb_state.json")
         page = context.new_page()
-        page.goto("https://www.facebook.com/appledaily.tw/posts")
+        page.goto("https://www.facebook.com/appledaily.tw/posts", timeout=60000)
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(3000)
         expand_see_more(page)
 
+        found_any = False
         for selector in selectors:
             try:
-                page.wait_for_selector(selector, timeout=8000)
+                page.wait_for_selector(selector, timeout=4000)
                 articles = page.query_selector_all(selector)
                 if articles:
+                    found_any = True
                     for a in articles[:3]:
                         text = a.inner_text()
                         post_id = a.get_attribute("data-ft") or str(hash(text))
@@ -84,11 +91,18 @@ def run_scraper():
                         send_to_discord(f"📢 新貼文：\n{preview}")
                         save_post(post_id, preview)
                     break
-            except:
+            except Exception as e:
+                app.logger.warning(f"⚠️ 無法找到選擇器 {selector}：{e}")
                 continue
+
         page.close()
         context.close()
         browser.close()
+
+        if found_any:
+            app.logger.info("✅ 爬蟲完成，已推送貼文至 Discord。")
+        else:
+            app.logger.warning("⚠️ 沒有找到任何貼文內容。")
 
 # === Flask 路由 ===
 @app.route("/")
@@ -97,21 +111,27 @@ def index():
 
 @app.route("/run")
 def run():
-    try:
-        run_scraper()
-        return Response("✅ 執行完成", status=200)
-    except Exception as e:
-        return Response(f"❌ 執行錯誤：{str(e)}", status=500)
+    def run_task():
+        try:
+            run_scraper()
+        except Exception as e:
+            app.logger.error(f"❌ 爬蟲執行錯誤：{e}")
+
+    threading.Thread(target=run_task, daemon=True).start()
+    return Response("🚀 已啟動背景爬蟲，請稍候幾秒再查看 !fbstatus", status=200)
 
 @app.route("/status")
 def status():
-    return jsonify({
-        "fb_state_exists": os.path.exists("fb_state.json"),
-        "env_FB_EMAIL": bool(os.getenv("FB_EMAIL")),
-        "env_FB_PASSWORD": bool(os.getenv("FB_PASSWORD")),
-        "env_DISCORD_WEBHOOK_URL": bool(os.getenv("DISCORD_WEBHOOK_URL")),
-        "recent_posts": get_all_posts(limit=5)
-    })
+    try:
+        return jsonify({
+            "fb_state_exists": os.path.exists("fb_state.json"),
+            "env_FB_EMAIL": bool(os.getenv("FB_EMAIL")),
+            "env_FB_PASSWORD": bool(os.getenv("FB_PASSWORD")),
+            "env_DISCORD_WEBHOOK_URL": bool(os.getenv("DISCORD_WEBHOOK_URL")),
+            "recent_posts": get_all_posts(limit=5)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route("/refresh-login")
 def refresh_login():
@@ -128,7 +148,7 @@ def debug_login():
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             page.goto("https://www.facebook.com/login", timeout=30000)
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(2000)
             screenshot_path = "login_debug.png"
             page.screenshot(path=screenshot_path)
             page.close()

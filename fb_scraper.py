@@ -112,7 +112,7 @@ def run_scraper():
     with sync_playwright() as p:
         # 🔧 超低記憶體模式啟動 Chromium
         browser = p.chromium.launch(
-            headless=True,
+            headless=False,
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",

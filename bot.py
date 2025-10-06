@@ -9,6 +9,12 @@ load_dotenv()  # ✅ 支援 .env 檔案
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 API_URL = "https://carrotbot-z-x-n-information.onrender.com".rstrip("/")
 
+if not TOKEN:
+    raise ValueError("❌ DISCORD_BOT_TOKEN 未設定，請確認環境變數或 .env 檔案")
+
+print(f"🔐 DISCORD_BOT_TOKEN 載入成功：{TOKEN[:10]}...")
+print(f"🌐 API_URL：{API_URL}")
+
 intents = discord.Intents.default()
 intents.message_content = True
 client = commands.Bot(command_prefix="!", intents=intents)

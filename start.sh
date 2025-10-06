@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "🚀 start.sh 已執行"  # ← 放這裡，最早輸出
+
 # ✅ 設定 Playwright 安裝路徑（Render 支援）
 export PLAYWRIGHT_BROWSERS_PATH=0
 

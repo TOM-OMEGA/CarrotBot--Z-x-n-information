@@ -282,10 +282,10 @@ def status():
         print(f"❌ /status 發生錯誤：{e}")
         return jsonify({"error": str(e)})
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
-    return "✅ FB爬蟲助手已啟動"
-
+    return "✅ FB Scraper API 已啟動"
+    
 @app.route("/upload-cookie", methods=["POST"])
 def upload_cookie():
     file = request.files.get("file")
@@ -301,6 +301,9 @@ def upload_cookie():
 
 @app.route("/routes", methods=["GET"])
 def list_routes():
+    print("📚 已掛載路由：")
+    for rule in app.url_map.iter_rules():
+        print(f" - {rule}")
     return "\n".join([str(rule) for rule in app.url_map.iter_rules()])
 
 @app.route("/clear-cookie", methods=["POST"])

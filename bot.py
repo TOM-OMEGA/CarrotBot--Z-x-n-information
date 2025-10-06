@@ -1,230 +1,89 @@
-import discord
-from discord.ext import commands
-import requests
 import os
-from dotenv import load_dotenv
+import discord
+import requests
+import json
+from discord.ext import commands
 
-load_dotenv()  # ✅ 支援 .env 檔案
-
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-API_URL = "https://carrotbot-z-x-n-information-wrx7.onrender.com"
-
-if not TOKEN:
-    raise ValueError("❌ DISCORD_BOT_TOKEN 未設定，請確認環境變數或 .env 檔案")
-
-print(f"🔐 DISCORD_BOT_TOKEN 載入成功：{TOKEN[:10]}...")
-print(f"🌐 API_URL：{API_URL}")
+# ---------------------- 基本設定 ----------------------
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+API_URL = os.getenv("API_URL", "https://carrotbot-z-x-n-information-wrx7.onrender.com")
 
 intents = discord.Intents.default()
 intents.message_content = True
-client = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-@client.event
-async def on_ready():
-    print(f"✅ Bot 已啟動：{client.user}")
 
-# 📦 !fbrefresh：更新 Facebook 登入狀態
-@client.command()
-async def fbrefresh(ctx):
-    await ctx.send("🔄 正在更新 Facebook 登入狀態...")
+# ---------------------- 指令：上傳 Cookie ----------------------
+@bot.command()
+async def fbupload(ctx, *, json_text: str = None):
+    """上傳 fb_state.json cookie"""
+    if not json_text:
+        await ctx.reply("❌ 請附上 cookie JSON 內容！")
+        return
+
     try:
-        r = requests.get(f"{API_URL}/refresh-login", timeout=30)
-        await ctx.send(r.text)
+        # 嘗試解析 JSON
+        cookie_data = json.loads(json_text)
+        res = requests.post(f"{API_URL}/upload", json=cookie_data)
+        await ctx.reply(f"伺服器回應：{res.status_code} → {res.text}")
     except Exception as e:
-        await ctx.send(f"⚠️ 錯誤：{str(e)}")
+        await ctx.reply(f"❌ 上傳發生錯誤：{e}")
 
-# 📦 !fbstatus：查詢爬蟲系統健康狀態
-@client.command()
-async def fbstatus(ctx):
-    await ctx.send("📡 正在查詢爬蟲狀態...")
-    try:
-        r = requests.get(f"{API_URL}/status", timeout=15)
-        data = r.json()
-        if "error" in data:
-            await ctx.send(f"❌ 錯誤：{data['error']}")
-        else:
-            msg = (
-                f"🗂 fb_state.json：{data['fb_state_exists']}\n"
-                f"🔐 FB_EMAIL：{data['env_FB_EMAIL']}\n"
-                f"🔐 FB_PASSWORD：{data['env_FB_PASSWORD']}\n"
-                f"📣 Webhook：{data['env_DISCORD_WEBHOOK_URL']}\n"
-                f"📝 最近貼文：\n" +
-                "\n".join([f"- {p['created_at'][:19]} → {p['content'][:50]}" for p in data["recent_posts"]])
-            )
-            await ctx.send(msg)
-    except Exception as e:
-        await ctx.send(f"⚠️ 錯誤：{str(e)}")
 
-# 📦 !fbrun：執行爬蟲並推送貼文
-@client.command()
+# ---------------------- 指令：啟動爬蟲 ----------------------
+@bot.command()
 async def fbrun(ctx):
-    await ctx.send("🚀 正在執行爬蟲...")
+    """啟動 Facebook 爬蟲"""
+    await ctx.reply("🚀 正在執行爬蟲...")
     try:
-        r = requests.get(f"{API_URL}/run", timeout=180)
-        await ctx.send(r.text)
+        res = requests.get(f"{API_URL}/run", timeout=10)
+        await ctx.reply(f"伺服器回應：{res.status_code} → {res.text}")
     except Exception as e:
-        await ctx.send(f"⚠️ 錯誤：{str(e)}")
+        await ctx.reply(f"❌ 執行錯誤：{e}")
 
-# 📦 !debuglogin：擷取 Facebook 登入畫面
-@client.command()
-async def debuglogin(ctx):
-    await ctx.send("🧪 擷取 Facebook 登入畫面中...")
-    try:
-        r = requests.get(f"{API_URL}/debug-login", timeout=30)
-        data = r.json()
-        if "image_base64" in data:
-            preview = data["image_base64"][:500] + "..."
-            await ctx.send("📷 登入畫面擷取成功（base64 預覽）：")
-            await ctx.send(f"```{preview}```")
-            await ctx.send("🔧 可用 [base64-to-image](https://codebeautify.org/base64-to-image-converter) 還原圖片")
-        else:
-            await ctx.send(f"❌ 登入畫面錯誤：{data.get('error', '未知錯誤')}")
-    except Exception as e:
-        await ctx.send(f"⚠️ 錯誤：{str(e)}")
 
-# 📦 !fbcheck：一鍵診斷系統狀態與登入畫面
-@client.command()
-async def fbcheck(ctx):
-    await ctx.send("🧪 正在執行系統診斷...")
+# ---------------------- 指令：查詢狀態 ----------------------
+@bot.command()
+async def fbstatus(ctx):
+    """查詢爬蟲狀態與最近貼文"""
+    await ctx.reply("📡 正在查詢爬蟲狀態...")
     try:
-        # 呼叫 /status
-        r1 = requests.get(f"{API_URL}/status", timeout=15)
-        try:
-            data = r1.json()
-        except Exception as e:
-            await ctx.send(f"❌ 無法解析 /status 回應：{r1.text[:200]}")
+        res = requests.get(f"{API_URL}/status", timeout=10)
+        data = res.json()
+
+        fb_state = "✅" if data.get("fb_state.json") else "❌"
+        posts = data.get("recent_posts", [])
+        reply_text = f"🗂 fb_state.json：{fb_state}\n📄 貼文數：{len(posts)}"
+
+        if not posts:
+            reply_text += "\n❌ 尚無貼文記錄"
+            await ctx.reply(reply_text)
             return
 
-        # 分析 /status 回應
-        if "error" in data:
-            await ctx.send(f"❌ 狀態錯誤：{data['error']}")
-        else:
-            msg = (
-                f"🗂 fb_state.json：{data['fb_state_exists']}\n"
-                f"🔐 FB_EMAIL：{data['env_FB_EMAIL']}\n"
-                f"🔐 FB_PASSWORD：{data['env_FB_PASSWORD']}\n"
-                f"📣 Webhook：{data['env_DISCORD_WEBHOOK_URL']}\n"
-                f"📝 最近貼文：\n" +
-                "\n".join([f"- {p['created_at'][:19]} → {p['content'][:50]}" for p in data["recent_posts"]])
+        # 顯示最新貼文
+        for post in posts:
+            content = post.get("content", "(無文字)").strip() or "(無文字)"
+            image = post.get("image")
+
+            embed = discord.Embed(
+                title="📢 Facebook 最新貼文",
+                description=content[:1500],
+                color=0x00AAFF
             )
-            await ctx.send(msg)
+            embed.set_footer(text=f"🕓 {post.get('timestamp')}")
+            if image:
+                embed.set_image(url=image)
 
-        # 呼叫 /debug-login
-        r2 = requests.get(f"{API_URL}/debug-login", timeout=30)
-        data2 = r2.json()
-        if "image_base64" in data2:
-            preview = data2["image_base64"][:500] + "..."
-            await ctx.send("📷 登入畫面擷取成功（base64 預覽）：")
-            await ctx.send(f"```{preview}```")
-            await ctx.send("🔧 可用 [base64-to-image](https://codebeautify.org/base64-to-image-converter) 還原圖片")
-        else:
-            await ctx.send(f"❌ 登入畫面錯誤：{data2.get('error', '未知錯誤')}")
+            await ctx.send(embed=embed)
+
     except Exception as e:
-        await ctx.send(f"⚠️ 系統診斷失敗：{str(e)}")
+        await ctx.reply(f"❌ 無法查詢狀態：{e}")
 
-@client.command()
-async def fbraw(ctx):
-    await ctx.send("📡 正在擷取 /status 原始回應...")
-    try:
-        r = requests.get(f"{API_URL}/status", timeout=15)
-        await ctx.send(f"```{r.text[:1500]}```")
-    except Exception as e:
-        await ctx.send(f"⚠️ 錯誤：{str(e)}")
 
-@client.command()
-async def fbview(ctx):
-    if os.path.exists("login_error.png"):
-        await ctx.send(file=discord.File("login_error.png"))
-    else:
-        await ctx.send("⚠️ 尚未擷取登入錯誤畫面，請先執行 login_once.py 或使用 !debuglogin")
+# ---------------------- 啟動 ----------------------
+@bot.event
+async def on_ready():
+    print(f"🤖 已登入 Discord：{bot.user}")
+    print(f"🌐 API_URL：{API_URL}")
 
-@client.command()
-async def fbupload(ctx):
-    if not ctx.message.attachments:
-        await ctx.send("❌ 請附加 fb_state.json 檔案")
-        return
-
-    attachment = ctx.message.attachments[0]
-    if attachment.filename != "fb_state.json":
-        await ctx.send("⚠️ 檔名必須為 fb_state.json")
-        return
-
-    try:
-        file_bytes = await attachment.read()
-        r = requests.post(f"{API_URL}/upload-cookie", files={"file": ("fb_state.json", file_bytes)})
-        await ctx.send(r.text)
-        await ctx.send(f"伺服器回應：{r.status_code} → {r.text}")
-    except Exception as e:
-        await ctx.send(f"❌ 上傳失敗：{str(e)}")
-
-@client.command()
-async def fbroute(ctx):
-    try:
-        r = requests.get(f"{API_URL}/routes", timeout=10)
-        await ctx.send(f"📚 路由列表：\n```{r.text}```")
-    except Exception as e:
-        await ctx.send(f"⚠️ 無法取得路由：{str(e)}")
-
-@client.command()
-async def fbclear(ctx):
-    try:
-        r = requests.post(f"{API_URL}/clear-cookie", timeout=10)
-        await ctx.send(f"🧹 清除結果：{r.status_code} → {r.text}")
-    except Exception as e:
-        await ctx.send(f"⚠️ 清除失敗：{str(e)}")
-
-@client.command()
-async def fbpanel(ctx):
-    await ctx.send("📊 正在載入系統面板...")
-    try:
-        r1 = requests.get(f"{API_URL}/status", timeout=15)
-        data = r1.json()
-        msg = (
-            f"🗂 fb_state.json：{data['fb_state_exists']}\n"
-            f"🔐 FB_EMAIL：{data['env_FB_EMAIL']}\n"
-            f"🔐 FB_PASSWORD：{data['env_FB_PASSWORD']}\n"
-            f"📣 Webhook：{data['env_DISCORD_WEBHOOK_URL']}\n"
-            f"📝 最近貼文：\n" +
-            "\n".join([f"- {p['created_at'][:19]} → {p['content'][:50]}" for p in data.get("recent_posts", [])])
-        )
-        await ctx.send(msg)
-
-        r2 = requests.get(f"{API_URL}/debug-login", timeout=30)
-        data2 = r2.json()
-        if "image_base64" in data2:
-            preview = data2["image_base64"][:500] + "..."
-            await ctx.send("📷 登入畫面擷取成功（base64 預覽）：")
-            await ctx.send(f"```{preview}```")
-            await ctx.send("🔧 可用 [base64-to-image](https://codebeautify.org/base64-to-image-converter) 還原圖片")
-        else:
-            await ctx.send(f"❌ 登入畫面錯誤：{data2.get('error', '未知錯誤')}")
-    except Exception as e:
-        await ctx.send(f"⚠️ 面板載入失敗：{str(e)}")
-        
-# 📦 !fbhelp：顯示所有指令與用途說明
-@client.command()
-async def fbhelp(ctx):
-    help_msg = (
-        "**🧭 FB爬蟲助手指令總覽**\n\n"
-        "**📡 系統狀態與診斷**\n"
-        "`!fbstatus` → 查詢爬蟲系統健康狀態\n"
-        "`!fbcheck` → 一鍵診斷登入狀態與登入畫面\n"
-        "`!fbraw` → 顯示 /status 原始回應內容\n"
-        "`!fbroute` → 顯示 Flask 所有 API 路由\n"
-        "`!fbpanel` → 顯示系統面板（狀態 + 登入畫面）\n\n"
-        "**🔐 登入與 Cookie 管理**\n"
-        "`!fbupload` → 上傳登入 cookie（fb_state.json）\n"
-        "`!fbclear` → 清除伺服器上的 cookie\n"
-        "`!debuglogin` → 擷取 Facebook 登入畫面（base64）\n"
-        "`!fbview` → 回傳登入錯誤畫面 login_error.png\n\n"
-        "**🚀 執行爬蟲與推送貼文**\n"
-        "`!fbrun` → 執行爬蟲並推送貼文\n"
-        "`!fbrefresh` → 更新 Facebook 登入狀態\n\n"
-        "**📖 說明與幫助**\n"
-        "`!fbhelp` → 顯示所有指令與用途說明"
-    )
-    await ctx.send(help_msg)
-
-# ✅ 啟動 Bot
-if __name__ == "__main__":
-    client.run(TOKEN)
+bot.run(DISCORD_BOT_TOKEN)

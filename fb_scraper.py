@@ -1,18 +1,19 @@
-print("🔥 fb_scraper.py 版本識別：2025-10-06 14:10")
-
 from playwright.sync_api import sync_playwright
-import os, requests, sqlite3
+import os, requests, sqlite3, base64
 from flask import Flask, Response, jsonify, request
 from datetime import datetime
+from refresh_login import refresh_fb_login
 
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 DB_FILE = "posts.db"
 app = Flask(__name__)
 
+# === Discord 推送功能 ===
 def send_to_discord(content):
     if WEBHOOK_URL:
         requests.post(WEBHOOK_URL, json={"content": content})
 
+# === SQLite 初始化 ===
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -29,8 +30,7 @@ def init_db():
 def save_post(post_id, content):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO posts (id, content, created_at) VALUES (?, ?, ?)",
-              (post_id, content, datetime.utcnow().isoformat()))
+    c.execute("INSERT OR IGNORE INTO posts (id, content, created_at) VALUES (?, ?, ?)", (post_id, content, datetime.utcnow().isoformat()))
     conn.commit()
     conn.close()
 
@@ -42,25 +42,19 @@ def get_all_posts(limit=20):
     conn.close()
     return [{"id": r[0], "content": r[1], "created_at": r[2]} for r in rows]
 
+# === 主要爬蟲 ===
 def expand_see_more(page):
     page.wait_for_timeout(2000)
     keywords = ["see more", "顯示更多", "查看更多"]
-    expanded = 0
     for keyword in keywords:
         try:
             locators = page.locator(f'xpath=//*[contains(text(), "{keyword}")]')
-            count = min(locators.count(), 5)  # 限制最多展開 5 個
-            print(f"🔍 嘗試展開「{keyword}」：最多展開 {count} 個")
+            count = min(locators.count(), 5)
             for i in range(count):
-                try:
-                    locators.nth(i).click(timeout=1000)
-                    page.wait_for_timeout(500)
-                    expanded += 1
-                except Exception as e:
-                    print(f"⚠️ 點擊失敗：{e}")
-        except Exception as e:
-            print(f"⚠️ 無法搜尋「{keyword}」：{e}")
-    print(f"✅ 展開成功 {expanded} 個貼文")
+                locators.nth(i).click(timeout=1000)
+                page.wait_for_timeout(500)
+        except:
+            pass
 
 def run_scraper():
     selectors = [
@@ -83,8 +77,7 @@ def run_scraper():
                 page.wait_for_selector(selector, timeout=8000)
                 articles = page.query_selector_all(selector)
                 if articles:
-                    print(f"✅ 使用 selector：{selector}，找到 {len(articles)} 篇貼文")
-                    for a in articles[:3]:  # 最多處理 3 篇
+                    for a in articles[:3]:
                         text = a.inner_text()
                         post_id = a.get_attribute("data-ft") or str(hash(text))
                         preview = text[:200] + "..." if len(text) > 200 else text
@@ -92,10 +85,15 @@ def run_scraper():
                         save_post(post_id, preview)
                     break
             except:
-                print(f"⚠️ selector 超時或無結果：{selector}")
+                continue
         page.close()
         context.close()
         browser.close()
+
+# === Flask 路由 ===
+@app.route("/")
+def index():
+    return "✅ FB爬蟲助手已啟動"
 
 @app.route("/run")
 def run():
@@ -105,133 +103,15 @@ def run():
     except Exception as e:
         return Response(f"❌ 執行錯誤：{str(e)}", status=500)
 
-@app.route("/preview")
-def preview():
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(storage_state="fb_state.json")
-            page = context.new_page()
-            page.goto("https://www.facebook.com/appledaily.tw/posts")
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(3000)
-            title = page.title()
-            url = page.url
-            page.close()
-            context.close()
-            browser.close()
-            return jsonify({"title": title, "url": url})
-    except Exception as e:
-        return Response(f"❌ 錯誤：{str(e)}", status=500)
-
-@app.route("/history")
-def history():
-    return jsonify(get_all_posts())
-
-@app.route("/debug")
-def debug():
-    result = {}
-    try:
-        result["fb_state_exists"] = os.path.exists("fb_state.json")
-        result["env_FB_EMAIL"] = bool(os.getenv("FB_EMAIL"))
-        result["env_FB_PASSWORD"] = bool(os.getenv("FB_PASSWORD"))
-        result["env_DISCORD_WEBHOOK_URL"] = bool(os.getenv("DISCORD_WEBHOOK_URL"))
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(storage_state="fb_state.json")
-            page = context.new_page()
-            page.goto("https://www.facebook.com/appledaily.tw/posts")
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(3000)
-            html = page.content()
-            result["html_length"] = len(html)
-            result["contains_article_div"] = (
-                'data-ad-preview="message"' in html or
-                'data-testid="post_message"' in html or
-                'FeedUnit_' in html
-            )
-            page.close()
-            context.close()
-            browser.close()
-    except Exception as e:
-        result["error"] = str(e)
-    return jsonify(result)
-
-@app.route("/selector-test")
-def selector_test():
-    selector = request.args.get("q", 'div[data-testid="post_message"]')
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(storage_state="fb_state.json")
-            page = context.new_page()
-            page.goto("https://www.facebook.com/appledaily.tw/posts")
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(3000)
-            page.wait_for_selector(selector, timeout=10000)
-            elements = page.query_selector_all(selector)
-            previews = [e.inner_text()[:100] for e in elements[:5]]
-            page.close()
-            context.close()
-            browser.close()
-            return jsonify({
-                "selector": selector,
-                "count": len(elements),
-                "previews": previews
-            })
-    except Exception as e:
-        return jsonify({"error": str(e), "selector": selector})
-
-@app.route("/selector-test-fallback")
-def selector_test_fallback():
-    selectors = [
-        'div[data-testid="post_message"]',
-        'div[data-ad-preview="message"]',
-        'div[data-pagelet^="FeedUnit_"]',
-        'div[role="article"]'
-    ]
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(storage_state="fb_state.json")
-            page = context.new_page()
-            page.goto("https://www.facebook.com/appledaily.tw/posts")
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(3000)
-
-            for selector in selectors:
-                try:
-                    page.wait_for_selector(selector, timeout=8000)
-                    elements = page.query_selector_all(selector)
-                    if elements:
-                        previews = [e.inner_text()[:100] for e in elements[:5]]
-                        page.close()
-                        context.close()
-                        browser.close()
-                        return jsonify({
-                            "selector": selector,
-                            "count": len(elements),
-                            "previews": previews
-                        })
-                except:
-                    continue
-            page.close()
-            context.close()
-            browser.close()
-            return jsonify({"error": "所有 selector 都失敗"})
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-@app.route("/health")
-def health():
-    return Response("OK", status=200)
-
-if __name__ == "__main__":
-    init_db()
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-from refresh_login import refresh_fb_login
+@app.route("/status")
+def status():
+    return jsonify({
+        "fb_state_exists": os.path.exists("fb_state.json"),
+        "env_FB_EMAIL": bool(os.getenv("FB_EMAIL")),
+        "env_FB_PASSWORD": bool(os.getenv("FB_PASSWORD")),
+        "env_DISCORD_WEBHOOK_URL": bool(os.getenv("DISCORD_WEBHOOK_URL")),
+        "recent_posts": get_all_posts(limit=5)
+    })
 
 @app.route("/refresh-login")
 def refresh_login():
@@ -244,48 +124,21 @@ def refresh_login():
 @app.route("/debug-login")
 def debug_login():
     try:
-        from playwright.sync_api import sync_playwright
-        import base64
-
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context()
-            page = context.new_page()
+            page = browser.new_page()
             page.goto("https://www.facebook.com/login", timeout=30000)
             page.wait_for_timeout(3000)
             screenshot_path = "login_debug.png"
             page.screenshot(path=screenshot_path)
             page.close()
-            context.close()
             browser.close()
-
         with open(screenshot_path, "rb") as f:
             encoded = base64.b64encode(f.read()).decode("utf-8")
         return jsonify({"image_base64": encoded})
-
     except Exception as e:
         return jsonify({"error": str(e)})
 
-@app.route("/status")
-def status():
-    print("📡 收到 /status 請求")
-    try:
-        result = {
-            "fb_state_exists": os.path.exists("fb_state.json"),
-            "env_FB_EMAIL": bool(os.getenv("FB_EMAIL")),
-            "env_FB_PASSWORD": bool(os.getenv("FB_PASSWORD")),
-            "env_DISCORD_WEBHOOK_URL": bool(os.getenv("DISCORD_WEBHOOK_URL")),
-            "recent_posts": get_all_posts(limit=5)
-        }
-        return jsonify(result)
-    except Exception as e:
-        print(f"❌ /status 發生錯誤：{e}")
-        return jsonify({"error": str(e)})
-
-@app.route("/", methods=["GET"])
-def index():
-    return "✅ FB Scraper API 已啟動"
-    
 @app.route("/upload-cookie", methods=["POST"])
 def upload_cookie():
     file = request.files.get("file")
@@ -299,11 +152,6 @@ def upload_cookie():
     except Exception as e:
         return f"❌ 儲存失敗：{str(e)}"
 
-@app.route("/routes", methods=["GET"])
-def list_routes():
-    print("📚 Render 測試：已掛載路由如下")
-    return "✅ Render 測試成功：\n" + "\n".join([str(rule) for rule in app.url_map.iter_rules()])
-
 @app.route("/clear-cookie", methods=["POST"])
 def clear_cookie():
     try:
@@ -314,12 +162,20 @@ def clear_cookie():
     except Exception as e:
         return f"❌ 清除失敗：{str(e)}"
 
-# ✅ 合併主程式區塊
+@app.route("/routes")
+def list_routes():
+    return "\n".join([str(rule) for rule in app.url_map.iter_rules()])
+
+@app.route("/health")
+def health():
+    return "OK", 200
+
+# === 啟動伺服器 ===
 if __name__ == "__main__":
-    print("🔥 __main__ 區塊已執行")
     print("✅ Flask 啟動中：fb_scraper.py")
     print("📚 已掛載路由：")
     for rule in app.url_map.iter_rules():
         print(f" - {rule}")
-    port = int(os.getenv("PORT", 10000))
+    init_db()
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)

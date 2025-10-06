@@ -1,8 +1,21 @@
 from playwright.sync_api import sync_playwright
-import os, requests, sqlite3, base64, threading
+import os, requests, sqlite3, base64, threading, json
 from flask import Flask, Response, jsonify, request
 from datetime import datetime
 from refresh_login import refresh_fb_login
+
+# === 工作目錄修正 ===
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# === 自動載入 Cookie 檔案 ===
+state_env = os.getenv("FB_STATE_JSON")
+if state_env and not os.path.exists("fb_state.json"):
+    try:
+        with open("fb_state.json", "w", encoding="utf-8") as f:
+            f.write(base64.b64decode(state_env).decode("utf-8"))
+        print("✅ 已從環境變數還原 fb_state.json")
+    except Exception as e:
+        print(f"⚠️ 無法還原 fb_state.json：{e}")
 
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 DB_FILE = "posts.db"
@@ -68,6 +81,9 @@ def run_scraper():
         'div[data-pagelet^="FeedUnit_"]',
         'div[role="article"]'
     ]
+    if not os.path.exists("fb_state.json"):
+        raise FileNotFoundError("❌ 缺少 fb_state.json，請先上傳或設定 FB_STATE_JSON")
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(storage_state="fb_state.json")

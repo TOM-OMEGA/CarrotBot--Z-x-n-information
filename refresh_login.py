@@ -1,41 +1,37 @@
+# refresh_login.py
 from playwright.sync_api import sync_playwright
-import os
+import os, json, time
 
 def refresh_fb_login():
-    email = os.getenv("FB_EMAIL")
-    password = os.getenv("FB_PASSWORD")
+    FB_EMAIL = os.getenv("FB_EMAIL")
+    FB_PASSWORD = os.getenv("FB_PASSWORD")
 
-    if not email or not password:
-        print("❌ 請先設定 FB_EMAIL 和 FB_PASSWORD 環境變數")
-        return
+    if not FB_EMAIL or not FB_PASSWORD:
+        raise Exception("❌ 未設定 FB_EMAIL 或 FB_PASSWORD 環境變數")
+
+    print("🌐 正在登入 Facebook...")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)  # Render 上建議 headless=True
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
+        page.goto("https://www.facebook.com/login", timeout=60000)
 
-        try:
-            page.goto("https://www.facebook.com/login", timeout=30000)
-            page.wait_for_selector("input[name='email']", timeout=10000)
-            page.fill("input[name='email']", email)
-            page.fill("input[name='pass']", password)
-            page.wait_for_selector("button[name='login']", timeout=10000)
-            page.click("button[name='login']", timeout=5000)
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(3000)
+        page.fill("input[name='email']", FB_EMAIL)
+        page.fill("input[name='pass']", FB_PASSWORD)
+        page.click("button[name='login']")
+        page.wait_for_timeout(8000)  # 等待重導完成
 
-            # 登入失敗偵測
-            if "login" in page.url or "checkpoint" in page.url:
-                print("❌ 登入失敗，可能需要驗證或帳密錯誤")
-                page.screenshot(path="login_error.png")
-            else:
-                context.storage_state(path="fb_state.json")
-                print("✅ 登入成功，已更新 fb_state.json")
+        if "login" in page.url:
+            raise Exception("❌ 登入失敗，請確認帳密或驗證狀態")
 
-        except Exception as e:
-            print(f"⚠️ 登入流程錯誤：{e}")
-            page.screenshot(path="login_exception.png")
+        storage = context.storage_state()
+        with open("fb_state.json", "w", encoding="utf-8") as f:
+            f.write(json.dumps(storage))
 
-        page.close()
+        print("✅ Cookie 已更新 fb_state.json")
         context.close()
         browser.close()
+
+if __name__ == "__main__":
+    refresh_fb_login()

@@ -1,19 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
+echo "🚀 啟動 Flask 伺服器中..."
 
-echo "🚀 start.sh 已執行"
+# 確保資料庫存在
+python3 -c "from fb_scraper import init_db; init_db()"
 
-# ✅ 安裝 Playwright Chromium（Render 無頭環境）
-export PLAYWRIGHT_BROWSERS_PATH=0
+# 安裝 Playwright Chromium（避免初次啟動缺失）
 playwright install chromium
 
-# ✅ 顯示目前目錄與檔案
-echo "📂 目前目錄內容："
-ls -l
-
-# ✅ 背景啟動 Discord Bot
-echo "✅ 啟動 Discord Bot 中..."
-python bot.py &
-
-# ✅ 啟動 Flask 主程式
-echo "✅ 啟動 Flask 主程式中..."
-python fb_scraper.py
+# 啟動 gunicorn（Render 會自動注入 PORT 環境變數）
+exec gunicorn fb_scraper:app --bind 0.0.0.0:${PORT:-10000} --workers 2 --timeout 120

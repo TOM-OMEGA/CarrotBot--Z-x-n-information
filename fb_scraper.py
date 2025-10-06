@@ -313,6 +313,10 @@ def clear_cookie():
 
 # ✅ 合併主程式區塊
 if __name__ == "__main__":
+    print("✅ Flask 啟動中：fb_scraper.py")
+    print("📚 已掛載路由：")
+    for rule in app.url_map.iter_rules():
+        print(f" - {rule}")
     init_db()
     port = int(os.getenv("PORT", 10000))
     app.run(host="0.0.0.0", port=port)

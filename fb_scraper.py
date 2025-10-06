@@ -1,4 +1,4 @@
-print("🔥 fb_scraper.py 已載入")
+print("🔥 fb_scraper.py 版本識別：2025-10-06 14:10")
 
 from playwright.sync_api import sync_playwright
 import os, requests, sqlite3
@@ -301,10 +301,8 @@ def upload_cookie():
 
 @app.route("/routes", methods=["GET"])
 def list_routes():
-    print("📚 已掛載路由：")
-    for rule in app.url_map.iter_rules():
-        print(f" - {rule}")
-    return "\n".join([str(rule) for rule in app.url_map.iter_rules()])
+    print("📚 Render 測試：已掛載路由如下")
+    return "✅ Render 測試成功：\n" + "\n".join([str(rule) for rule in app.url_map.iter_rules()])
 
 @app.route("/clear-cookie", methods=["POST"])
 def clear_cookie():

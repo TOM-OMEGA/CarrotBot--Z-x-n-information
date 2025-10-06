@@ -2,6 +2,9 @@ import discord
 from discord.ext import commands
 import requests
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # ✅ 支援 .env 檔案
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 API_URL = "https://carrotbot-z-x-n-information.onrender.com".rstrip("/")

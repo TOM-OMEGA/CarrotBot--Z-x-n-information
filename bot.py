@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()  # ✅ 支援 .env 檔案
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-API_URL = "https://carrotbot-z-x-n-information.onrender.com"
+API_URL = "https://carrotbot-z-x-n-information-wrx7.onrender.com"
 
 if not TOKEN:
     raise ValueError("❌ DISCORD_BOT_TOKEN 未設定，請確認環境變數或 .env 檔案")

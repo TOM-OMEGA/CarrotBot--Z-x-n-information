@@ -301,6 +301,16 @@ def upload_cookie():
 def list_routes():
     return "\n".join([str(rule) for rule in app.url_map.iter_rules()])
 
+@app.route("/clear-cookie", methods=["POST"])
+def clear_cookie():
+    try:
+        os.remove("fb_state.json")
+        return "✅ Cookie 已清除"
+    except FileNotFoundError:
+        return "⚠️ Cookie 不存在"
+    except Exception as e:
+        return f"❌ 清除失敗：{str(e)}"
+
 # ✅ 合併主程式區塊
 if __name__ == "__main__":
     init_db()

@@ -8,7 +8,7 @@ from flask import Flask
 
 # === 設定 ===
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-API_BASE = os.getenv("RENDER_API_URL", "").rstrip("/")
+API_BASE = os.getenv("RAILWAY_API_URL", "").rstrip("/")
 API_KEY = os.getenv("API_KEY", None)
 
 print(f"[DEBUG] DISCORD_BOT_TOKEN exists? {bool(BOT_TOKEN)}")

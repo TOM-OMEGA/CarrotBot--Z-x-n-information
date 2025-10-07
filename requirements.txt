@@ -1,6 +1,7 @@
-playwright
-requests
-flask
-cryptography
-discord.py
-aiohttp
+greenlet==3.0.3
+playwright==1.47.0
+requests==2.32.3
+flask==3.1.0
+cryptography==42.0.5
+discord.py==2.4.0
+aiohttp==3.9.5

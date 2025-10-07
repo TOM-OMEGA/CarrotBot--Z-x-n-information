@@ -28,8 +28,7 @@ def post_json(path, payload):
     headers = {"Content-Type": "application/json"}
     if API_KEY:
         headers["X-API-KEY"] = API_KEY
-    r = requests.post(url, headers=headers, json=payload, timeout=15)
-    return r
+    return requests.post(url, headers=headers, json=payload, timeout=15)
 
 
 def get_json(path):
@@ -37,8 +36,7 @@ def get_json(path):
     headers = {}
     if API_KEY:
         headers["X-API-KEY"] = API_KEY
-    r = requests.get(url, headers=headers, timeout=15)
-    return r
+    return requests.get(url, headers=headers, timeout=15)
 
 
 # -----------------------------
@@ -51,17 +49,38 @@ async def on_ready():
 
 @bot.command()
 async def fbupload(ctx, *, json_text: str = None):
-    """上傳 Facebook cookies JSON"""
-    if not json_text:
-        await ctx.send("請附上 cookies JSON 內容。")
-        return
-    try:
-        data = json.loads(json_text)
-    except Exception as e:
-        await ctx.send(f"❌ JSON 格式錯誤: {e}")
+    """上傳 Facebook cookies JSON（支援檔案或文字）"""
+    data = None
+
+    # --- 若有附加檔案 ---
+    if ctx.message.attachments:
+        file = ctx.message.attachments[0]
+        if not file.filename.endswith(".json"):
+            await ctx.send("❌ 請上傳 JSON 檔案（例如 fb_state.json）")
+            return
+        await ctx.send(f"📂 偵測到檔案：{file.filename}，正在讀取中...")
+        content = await file.read()
+        try:
+            data = json.loads(content.decode("utf-8"))
+        except Exception as e:
+            await ctx.send(f"❌ JSON 解析錯誤：{e}")
+            return
+
+    # --- 若使用文字輸入 ---
+    elif json_text:
+        try:
+            data = json.loads(json_text)
+        except Exception as e:
+            await ctx.send(f"❌ JSON 格式錯誤: {e}")
+            return
+
+    # --- 沒資料時 ---
+    else:
+        await ctx.send("請附上 cookies JSON 檔案或貼上 JSON 內容。")
         return
 
-    await ctx.send("📤 正在上傳 cookies 到伺服器...")
+    # --- 上傳至爬蟲伺服器 ---
+    await ctx.send("📤 正在上傳 cookies 到爬蟲伺服器...")
     try:
         r = post_json("/upload", data)
         await ctx.send(f"伺服器回應：{r.status_code} → {r.text[:400]}")
@@ -104,22 +123,20 @@ def home():
 
 def run_web():
     port = int(os.getenv("PORT", 10000))
-    print(f"🌐 Fake Flask server running on port {port}")
+    print(f"🌐 Render Flask server running on port {port}")
     web_app.run(host="0.0.0.0", port=port)
 
 
 # -----------------------------
-# 🚀 啟動主程式
+# 🚀 主程式啟動
 # -----------------------------
 if __name__ == "__main__":
     if not BOT_TOKEN:
         print("❌ ERROR: DISCORD_BOT_TOKEN 未設定，請到 Render Environment Variables 新增。")
     else:
-        # 啟動 Flask 伺服器在線上偵測
+        # 啟動 Flask 以通過 Render Web Service 檢測
         threading.Thread(target=run_web, daemon=True).start()
 
         # 啟動 Discord Bot
         print("🚀 啟動 Discord Bot...")
         bot.run(BOT_TOKEN)
-
-

@@ -77,3 +77,11 @@ async def fbrun(ctx):
 async def fbstatus(ctx):
     """查詢爬蟲狀態"""
     await ctx.send("📡 正在查詢爬蟲狀態...")
+
+if __name__ == "__main__":
+    if not BOT_TOKEN:
+        print("❌ ERROR: DISCORD_BOT_TOKEN 未設定，請到 Render Environment Variables 新增。")
+    else:
+        print("🚀 啟動 Discord Bot...")
+        bot.run(BOT_TOKEN)
+

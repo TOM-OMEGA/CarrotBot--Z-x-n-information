@@ -24,5 +24,7 @@ RUN pip install --upgrade pip setuptools wheel && \
 # 開放 Flask 預設埠
 EXPOSE 10000
 
-# 啟動
-CMD ["python", "fb_scraper.py"]
+# ------------------------------
+# 啟動 Discord Bot
+# ------------------------------
+CMD ["python3", "bot.py"]

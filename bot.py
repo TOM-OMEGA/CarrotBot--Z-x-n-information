@@ -1,3 +1,5 @@
+print(f"[DEBUG] DISCORD_BOT_TOKEN = {bool(BOT_TOKEN)}")
+
 import os
 import json
 import discord

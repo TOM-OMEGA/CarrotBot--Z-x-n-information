@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 echo "🚀 啟動 Flask + Discord Bot 中..."
-
 python3 --version
-echo "📂 檔案列表："
 ls -al
 
-echo "🧩 安裝 Playwright 依賴中..."
+echo "🧱 安裝必要系統套件..."
 apt-get update && apt-get install -y \
     wget libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
     libxcomposite1 libxdamage1 libxrandr2 libgbm-dev \
@@ -14,8 +12,5 @@ apt-get update && apt-get install -y \
     xdg-utils libdrm2 libxshmfence1 libgtk-3-0 \
     && rm -rf /var/lib/apt/lists/*
 
-echo "🧱 安裝 Chromium..."
-python3 -m playwright install chromium
-
-echo "🚀 啟動 Flask + Discord Bot..."
-python3 run_combined.py
+echo "🚀 啟動主程式 fb_scraper.py"
+python3 fb_scraper.py

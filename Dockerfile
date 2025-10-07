@@ -23,8 +23,6 @@ RUN pip install --upgrade pip setuptools wheel && \
 
 # 開放 Flask 預設埠
 EXPOSE 10000
-
-# ------------------------------
-# 啟動 Discord Bot
-# ------------------------------
+ENV DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+ENV RENDER_API_URL=${RENDER_API_URL}
 CMD ["python3", "bot.py"]

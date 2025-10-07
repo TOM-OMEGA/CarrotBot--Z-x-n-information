@@ -3,13 +3,14 @@ import json
 import discord
 from discord.ext import commands
 import requests
+import threading
+from flask import Flask
 
 # === 設定 ===
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 API_BASE = os.getenv("RENDER_API_URL", "").rstrip("/")
 API_KEY = os.getenv("API_KEY", None)
 
-# 加這行在這裡！
 print(f"[DEBUG] DISCORD_BOT_TOKEN exists? {bool(BOT_TOKEN)}")
 
 intents = discord.Intents.default()
@@ -19,6 +20,9 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
+# -----------------------------
+# 📡 API 請求功能
+# -----------------------------
 def post_json(path, payload):
     url = f"{API_BASE}{path}"
     headers = {"Content-Type": "application/json"}
@@ -37,6 +41,9 @@ def get_json(path):
     return r
 
 
+# -----------------------------
+# 🤖 Discord Bot 指令
+# -----------------------------
 @bot.event
 async def on_ready():
     print(f"✅ {bot.user} 上線了！")
@@ -77,11 +84,42 @@ async def fbrun(ctx):
 async def fbstatus(ctx):
     """查詢爬蟲狀態"""
     await ctx.send("📡 正在查詢爬蟲狀態...")
+    try:
+        r = get_json("/status")
+        await ctx.send(f"伺服器回應：{r.status_code} → {r.text[:400]}")
+    except Exception as e:
+        await ctx.send(f"❌ 查詢失敗: {e}")
 
+
+# -----------------------------
+# 🧱 Render 偵測用 Flask Web Server
+# -----------------------------
+web_app = Flask("keep_alive")
+
+
+@web_app.route("/")
+def home():
+    return "✅ Discord bot is running!", 200
+
+
+def run_web():
+    port = int(os.getenv("PORT", 10000))
+    print(f"🌐 Fake Flask server running on port {port}")
+    web_app.run(host="0.0.0.0", port=port)
+
+
+# -----------------------------
+# 🚀 啟動主程式
+# -----------------------------
 if __name__ == "__main__":
     if not BOT_TOKEN:
         print("❌ ERROR: DISCORD_BOT_TOKEN 未設定，請到 Render Environment Variables 新增。")
     else:
+        # 啟動 Flask 伺服器在線上偵測
+        threading.Thread(target=run_web, daemon=True).start()
+
+        # 啟動 Discord Bot
         print("🚀 啟動 Discord Bot...")
         bot.run(BOT_TOKEN)
+
 

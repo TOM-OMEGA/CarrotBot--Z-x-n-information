@@ -1,5 +1,3 @@
-print(f"[DEBUG] DISCORD_BOT_TOKEN = {bool(BOT_TOKEN)}")
-
 import os
 import json
 import discord
@@ -8,8 +6,11 @@ import requests
 
 # === 設定 ===
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-API_BASE = os.getenv("RENDER_API_URL", "").rstrip("/")  # 你的 Render Flask API
+API_BASE = os.getenv("RENDER_API_URL", "").rstrip("/")
 API_KEY = os.getenv("API_KEY", None)
+
+# 加這行在這裡！
+print(f"[DEBUG] DISCORD_BOT_TOKEN exists? {bool(BOT_TOKEN)}")
 
 intents = discord.Intents.default()
 intents.messages = True

@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 import requests
 import threading
+import time
 from flask import Flask
 
 # =========================================================
@@ -11,10 +12,12 @@ from flask import Flask
 # =========================================================
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 API_BASE = os.getenv("RAILWAY_API_URL", "").rstrip("/")
-API_KEY = os.getenv("RENDER_API_KEY")  # ✅ 改成與 Scraper 同名變數
+API_KEY = os.getenv("RENDER_API_KEY")
+SELF_URL = os.getenv("SELF_URL")  # ✅ 你的 Render URL，例如 https://dc-bot.onrender.com
 
 print(f"[DEBUG] DISCORD_BOT_TOKEN exists? {bool(BOT_TOKEN)}")
 print(f"[DEBUG] RAILWAY_API_URL: {API_BASE}")
+print(f"[DEBUG] SELF_URL: {SELF_URL}")
 print(f"[DEBUG] API_KEY exists? {bool(API_KEY)}")
 
 intents = discord.Intents.default()
@@ -57,7 +60,6 @@ async def fbupload(ctx, *, json_text: str = None):
     """上傳 Facebook cookies JSON（支援檔案或文字）"""
     data = None
 
-    # --- 若有附加檔案 ---
     if ctx.message.attachments:
         file = ctx.message.attachments[0]
         if not file.filename.endswith(".json"):
@@ -71,20 +73,16 @@ async def fbupload(ctx, *, json_text: str = None):
             await ctx.send(f"❌ JSON 解析錯誤：{e}")
             return
 
-    # --- 若使用文字輸入 ---
     elif json_text:
         try:
             data = json.loads(json_text)
         except Exception as e:
             await ctx.send(f"❌ JSON 格式錯誤: {e}")
             return
-
-    # --- 沒資料時 ---
     else:
         await ctx.send("請附上 cookies JSON 檔案或貼上 JSON 內容。")
         return
 
-    # --- 上傳至爬蟲伺服器 ---
     await ctx.send("📤 正在上傳 cookies 到爬蟲伺服器...")
     try:
         r = post_json("/upload", data)
@@ -116,10 +114,9 @@ async def fbstatus(ctx):
 
 
 # =========================================================
-# 🧱 Render 偵測用 Flask Web Server
+# 🧱 Flask 偵測伺服器
 # =========================================================
 web_app = Flask("keep_alive")
-
 
 @web_app.route("/")
 def home():
@@ -128,8 +125,25 @@ def home():
 
 def run_web():
     port = int(os.getenv("PORT", 10000))
-    print(f"🌐 Render Flask server running on port {port}")
+    print(f"🌐 Flask server running on port {port}")
     web_app.run(host="0.0.0.0", port=port)
+
+
+# =========================================================
+# 🕒 自動防休眠機制（每 4 分鐘 ping 一次自己）
+# =========================================================
+def keep_awake():
+    if not SELF_URL:
+        print("⚠️ 未設定 SELF_URL，跳過防休眠。")
+        return
+
+    while True:
+        try:
+            res = requests.get(SELF_URL, timeout=10)
+            print(f"💤 keep-alive ping → {res.status_code}")
+        except Exception as e:
+            print(f"⚠️ keep-alive 失敗: {e}")
+        time.sleep(240)  # 每 4 分鐘 ping 一次
 
 
 # =========================================================
@@ -139,8 +153,11 @@ if __name__ == "__main__":
     if not BOT_TOKEN:
         print("❌ ERROR: DISCORD_BOT_TOKEN 未設定，請到 Render Environment Variables 新增。")
     else:
-        # 啟動 Flask 以通過 Render Web Service 檢測
+        # 啟動 Flask 偵測伺服器
         threading.Thread(target=run_web, daemon=True).start()
+
+        # 啟動防休眠 thread
+        threading.Thread(target=keep_awake, daemon=True).start()
 
         # 啟動 Discord Bot
         print("🚀 啟動 Discord Bot...")

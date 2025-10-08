@@ -6,12 +6,16 @@ import requests
 import threading
 from flask import Flask
 
-# === 設定 ===
+# =========================================================
+# ⚙️ 設定
+# =========================================================
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 API_BASE = os.getenv("RAILWAY_API_URL", "").rstrip("/")
-API_KEY = os.getenv("API_KEY", None)
+API_KEY = os.getenv("RENDER_API_KEY")  # ✅ 改成與 Scraper 同名變數
 
 print(f"[DEBUG] DISCORD_BOT_TOKEN exists? {bool(BOT_TOKEN)}")
+print(f"[DEBUG] RAILWAY_API_URL: {API_BASE}")
+print(f"[DEBUG] API_KEY exists? {bool(API_KEY)}")
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -20,28 +24,29 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
-# -----------------------------
+# =========================================================
 # 📡 API 請求功能
-# -----------------------------
-def post_json(path, payload):
-    url = f"{API_BASE}{path}"
+# =========================================================
+def make_headers():
     headers = {"Content-Type": "application/json"}
     if API_KEY:
-        headers["X-API-KEY"] = API_KEY
-    return requests.post(url, headers=headers, json=payload, timeout=15)
+        headers["Authorization"] = f"Bearer {API_KEY}"
+    return headers
+
+
+def post_json(path, payload):
+    url = f"{API_BASE}{path}"
+    return requests.post(url, headers=make_headers(), json=payload, timeout=15)
 
 
 def get_json(path):
     url = f"{API_BASE}{path}"
-    headers = {}
-    if API_KEY:
-        headers["X-API-KEY"] = API_KEY
-    return requests.get(url, headers=headers, timeout=15)
+    return requests.get(url, headers=make_headers(), timeout=15)
 
 
-# -----------------------------
+# =========================================================
 # 🤖 Discord Bot 指令
-# -----------------------------
+# =========================================================
 @bot.event
 async def on_ready():
     print(f"✅ {bot.user} 上線了！")
@@ -110,9 +115,9 @@ async def fbstatus(ctx):
         await ctx.send(f"❌ 查詢失敗: {e}")
 
 
-# -----------------------------
+# =========================================================
 # 🧱 Render 偵測用 Flask Web Server
-# -----------------------------
+# =========================================================
 web_app = Flask("keep_alive")
 
 
@@ -127,9 +132,9 @@ def run_web():
     web_app.run(host="0.0.0.0", port=port)
 
 
-# -----------------------------
+# =========================================================
 # 🚀 主程式啟動
-# -----------------------------
+# =========================================================
 if __name__ == "__main__":
     if not BOT_TOKEN:
         print("❌ ERROR: DISCORD_BOT_TOKEN 未設定，請到 Render Environment Variables 新增。")

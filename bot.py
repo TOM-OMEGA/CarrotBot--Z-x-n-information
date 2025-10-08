@@ -10,13 +10,21 @@ from flask import Flask
 # ⚙️ 基本設定
 # =========================================================
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-SCRAPER_URL = os.getenv("SCRAPER_URL", "").rstrip("/")  # 例：https://your-scraper.onrender.com
+SCRAPER_URL = os.getenv("SCRAPER_URL", "").rstrip("/")
 RENDER_API_KEY = os.getenv("RENDER_API_KEY")
 
+print("===== BOT 啟動前環境檢查 =====")
 print(f"[DEBUG] Discord Bot Token exists? {bool(BOT_TOKEN)}")
-print(f"[DEBUG] Scraper URL: {SCRAPER_URL}")
+print(f"[DEBUG] Scraper URL: {SCRAPER_URL or '(未設定)'}")
 print(f"[DEBUG] API Key set? {bool(RENDER_API_KEY)}")
+print("=====================================")
 
+# --- URL 驗證 ---
+if SCRAPER_URL and not SCRAPER_URL.startswith("http"):
+    print("⚠️ SCRAPER_URL 格式錯誤！請加上 'https://' 或 'http://'")
+    SCRAPER_URL = None  # 禁止連線避免錯誤請求
+
+# --- Discord intents ---
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
@@ -26,11 +34,15 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # 📡 通用 HTTP 請求封裝（含授權）
 # =========================================================
 def post_json(path, payload):
+    if not SCRAPER_URL:
+        raise ValueError("SCRAPER_URL 未設定或格式錯誤（需以 http/https 開頭）")
     url = f"{SCRAPER_URL}{path}"
     headers = {"Authorization": f"Bearer {RENDER_API_KEY}", "Content-Type": "application/json"}
     return requests.post(url, json=payload, headers=headers, timeout=20)
 
 def get_json(path):
+    if not SCRAPER_URL:
+        raise ValueError("SCRAPER_URL 未設定或格式錯誤（需以 http/https 開頭）")
     url = f"{SCRAPER_URL}{path}"
     headers = {"Authorization": f"Bearer {RENDER_API_KEY}"}
     return requests.get(url, headers=headers, timeout=20)
@@ -66,6 +78,8 @@ async def fbupload(ctx):
     try:
         r = post_json("/upload", data)
         await ctx.send(f"📡 回應：{r.status_code} → {r.text[:400]}")
+    except ValueError as ve:
+        await ctx.send(f"⚠️ 設定錯誤：{ve}")
     except Exception as e:
         await ctx.send(f"❌ 上傳失敗：{e}")
 
@@ -76,6 +90,8 @@ async def fbrun(ctx):
     try:
         r = get_json("/run")
         await ctx.send(f"📡 回應：{r.status_code} → {r.text[:400]}")
+    except ValueError as ve:
+        await ctx.send(f"⚠️ 設定錯誤：{ve}")
     except Exception as e:
         await ctx.send(f"❌ 無法連線到爬蟲伺服器：{e}")
 
@@ -86,6 +102,8 @@ async def fbstatus(ctx):
     try:
         r = get_json("/status")
         await ctx.send(f"伺服器回應：{r.status_code} → {r.text[:400]}")
+    except ValueError as ve:
+        await ctx.send(f"⚠️ 設定錯誤：{ve}")
     except Exception as e:
         await ctx.send(f"❌ 查詢失敗：{e}")
 
@@ -96,7 +114,7 @@ web_app = Flask("keep_alive")
 
 @web_app.route("/")
 def home():
-    return "✅ Discord Bot is active!", 200
+    return "✅ Discord Bot is active and awake!", 200
 
 def run_web():
     port = int(os.getenv("PORT", 10000))
@@ -112,7 +130,7 @@ if __name__ == "__main__":
         exit(1)
 
     if not SCRAPER_URL or not RENDER_API_KEY:
-        print("⚠️ 警告：SCRAPER_URL 或 RENDER_API_KEY 未設定，無法安全連線爬蟲。")
+        print("⚠️ 警告：SCRAPER_URL 或 RENDER_API_KEY 未設定，Bot 將無法連線爬蟲伺服器。")
 
     # 啟動 Flask（防止 Render 判定休眠）
     threading.Thread(target=run_web, daemon=True).start()

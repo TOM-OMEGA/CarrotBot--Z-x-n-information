@@ -14,17 +14,22 @@ from flask import Flask
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 SCRAPER_URL = os.getenv("SCRAPER_URL", "").rstrip("/")
 RENDER_API_KEY = os.getenv("RENDER_API_KEY")
+SELF_URL = os.getenv("SELF_URL", "").rstrip("/")  # ✅ 新增自己的 Bot Render URL
 
 print("===== BOT 啟動前環境檢查 =====")
 print(f"[DEBUG] Discord Bot Token exists? {bool(BOT_TOKEN)}")
 print(f"[DEBUG] Scraper URL: {SCRAPER_URL or '(未設定)'}")
 print(f"[DEBUG] API Key set? {bool(RENDER_API_KEY)}")
+print(f"[DEBUG] Bot Self URL: {SELF_URL or '(未設定)'}")
 print("=====================================")
 
 # --- URL 驗證 ---
 if SCRAPER_URL and not SCRAPER_URL.startswith("http"):
     print("⚠️ SCRAPER_URL 格式錯誤！請加上 'https://' 或 'http://'")
     SCRAPER_URL = None
+if SELF_URL and not SELF_URL.startswith("http"):
+    print("⚠️ SELF_URL 格式錯誤！請加上 'https://' 或 'http://'")
+    SELF_URL = None
 
 # --- Discord intents ---
 intents = discord.Intents.default()
@@ -59,6 +64,28 @@ def request_with_retry(method, path, **kwargs):
             print(f"❌ 第 {i+1} 次請求失敗：{e}")
             time.sleep(5)
     return type("Resp", (), {"status_code": 504, "text": "⚠️ 無法連線至爬蟲伺服器（連續逾時）"})()
+
+# =========================================================
+# 🧩 自動 Keep-Alive 背景執行緒
+# =========================================================
+def keep_both_awake():
+    """每 10 分鐘同時 ping Scraper + 自己，保持 Render 不睡覺"""
+    while True:
+        try:
+            if SCRAPER_URL:
+                r = request_with_retry("get", "/status")
+                print(f"💤 Scraper Keep-alive：{r.status_code}")
+            if SELF_URL:
+                s = requests.get(SELF_URL, timeout=30)
+                print(f"🌐 Bot Self Keep-alive：{s.status_code}")
+        except Exception as e:
+            print(f"⚠️ Keep-alive 執行錯誤：{e}")
+        time.sleep(600)  # 每 10 分鐘執行一次
+
+def start_keep_alive_thread():
+    t = threading.Thread(target=keep_both_awake, daemon=True)
+    t.start()
+    print("🌙 已啟動 Scraper + Bot 雙向 Keep-alive 背景任務")
 
 # =========================================================
 # 🤖 Discord Bot 指令
@@ -128,7 +155,7 @@ async def fbstatus(ctx):
         await ctx.send(f"❌ 查詢失敗：{e}")
 
 # =========================================================
-# ☕ 防 Render 睡眠 Flask Web
+# ☕ Flask Keep-Alive Web
 # =========================================================
 web_app = Flask("keep_alive")
 
@@ -154,6 +181,9 @@ if __name__ == "__main__":
 
     # 啟動 Flask（防止 Render 判定休眠）
     threading.Thread(target=run_web, daemon=True).start()
+
+    # 啟動 Keep-alive（Scraper + 自己）
+    start_keep_alive_thread()
 
     # 啟動 Discord Bot
     print("🚀 啟動 Discord Bot...")

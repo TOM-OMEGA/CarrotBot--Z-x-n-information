@@ -1,6 +1,8 @@
 import os
 import json
 import threading
+import asyncio
+import time
 import requests
 import discord
 from discord.ext import commands
@@ -22,7 +24,7 @@ print("=====================================")
 # --- URL 驗證 ---
 if SCRAPER_URL and not SCRAPER_URL.startswith("http"):
     print("⚠️ SCRAPER_URL 格式錯誤！請加上 'https://' 或 'http://'")
-    SCRAPER_URL = None  # 禁止連線避免錯誤請求
+    SCRAPER_URL = None
 
 # --- Discord intents ---
 intents = discord.Intents.default()
@@ -31,24 +33,35 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # =========================================================
-# 📡 通用 HTTP 請求封裝（含授權）
+# 📡 HTTP 請求（含重試與授權）
 # =========================================================
-def post_json(path, payload):
+def request_with_retry(method, path, **kwargs):
     if not SCRAPER_URL:
         raise ValueError("SCRAPER_URL 未設定或格式錯誤（需以 http/https 開頭）")
-    url = f"{SCRAPER_URL}{path}"
-    headers = {"Authorization": f"Bearer {RENDER_API_KEY}", "Content-Type": "application/json"}
-    return requests.post(url, json=payload, headers=headers, timeout=20)
 
-def get_json(path):
-    if not SCRAPER_URL:
-        raise ValueError("SCRAPER_URL 未設定或格式錯誤（需以 http/https 開頭）")
     url = f"{SCRAPER_URL}{path}"
     headers = {"Authorization": f"Bearer {RENDER_API_KEY}"}
-    return requests.get(url, headers=headers, timeout=20)
+    if "json" in kwargs:
+        headers["Content-Type"] = "application/json"
+
+    retries = 3
+    for i in range(retries):
+        try:
+            print(f"[HTTP] {method.upper()} {url} (嘗試 {i+1}/{retries})")
+            if method == "get":
+                return requests.get(url, headers=headers, timeout=60)
+            elif method == "post":
+                return requests.post(url, headers=headers, **kwargs, timeout=60)
+        except requests.exceptions.ReadTimeout:
+            print("⚠️ 請求逾時，5 秒後重試...")
+            time.sleep(5)
+        except Exception as e:
+            print(f"❌ 第 {i+1} 次請求失敗：{e}")
+            time.sleep(5)
+    return type("Resp", (), {"status_code": 504, "text": "⚠️ 無法連線至爬蟲伺服器（連續逾時）"})()
 
 # =========================================================
-# 🤖 Discord Bot 事件與指令
+# 🤖 Discord Bot 指令
 # =========================================================
 @bot.event
 async def on_ready():
@@ -76,20 +89,29 @@ async def fbupload(ctx):
         return
 
     try:
-        r = post_json("/upload", data)
+        r = request_with_retry("post", "/upload", json=data)
         await ctx.send(f"📡 回應：{r.status_code} → {r.text[:400]}")
-    except ValueError as ve:
-        await ctx.send(f"⚠️ 設定錯誤：{ve}")
     except Exception as e:
         await ctx.send(f"❌ 上傳失敗：{e}")
 
 @bot.command()
 async def fbrun(ctx):
-    """啟動爬蟲"""
+    """啟動爬蟲（含自動查詢狀態與重試）"""
     await ctx.send("🚀 正在觸發爬蟲...")
     try:
-        r = get_json("/run")
-        await ctx.send(f"📡 回應：{r.status_code} → {r.text[:400]}")
+        r = request_with_retry("get", "/run")
+        await ctx.send(f"📡 初始回應：{r.status_code} → {r.text[:400]}")
+
+        if r.status_code == 200:
+            await ctx.send("⌛ 等待 30 秒後自動查詢爬蟲狀態（最多重試 3 次）...")
+            for i in range(3):
+                await asyncio.sleep(30)
+                s = request_with_retry("get", "/status")
+                await ctx.send(f"📊 第 {i+1} 次查詢 → {s.status_code}：{s.text[:400]}")
+                if '"posts_count":' in s.text and '"posts_count":0' not in s.text:
+                    await ctx.send("✅ 爬蟲似乎有抓到資料，停止重試！")
+                    break
+
     except ValueError as ve:
         await ctx.send(f"⚠️ 設定錯誤：{ve}")
     except Exception as e:
@@ -100,15 +122,13 @@ async def fbstatus(ctx):
     """查詢爬蟲狀態"""
     await ctx.send("📡 查詢爬蟲狀態中...")
     try:
-        r = get_json("/status")
+        r = request_with_retry("get", "/status")
         await ctx.send(f"伺服器回應：{r.status_code} → {r.text[:400]}")
-    except ValueError as ve:
-        await ctx.send(f"⚠️ 設定錯誤：{ve}")
     except Exception as e:
         await ctx.send(f"❌ 查詢失敗：{e}")
 
 # =========================================================
-# ☕ 防 Render 睡眠的小型 Flask Web 伺服器
+# ☕ 防 Render 睡眠 Flask Web
 # =========================================================
 web_app = Flask("keep_alive")
 
@@ -122,7 +142,7 @@ def run_web():
     web_app.run(host="0.0.0.0", port=port)
 
 # =========================================================
-# 🚀 啟動主程式
+# 🚀 主程式
 # =========================================================
 if __name__ == "__main__":
     if not BOT_TOKEN:

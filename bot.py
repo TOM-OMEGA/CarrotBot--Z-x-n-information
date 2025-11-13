@@ -1,3 +1,8 @@
+import sys
+# 🚫 避免 Discord.py 語音模組 crash
+sys.modules['discord.player'] = None
+sys.modules['discord.voice_client'] = None
+
 import discord
 from discord.ext import commands, tasks
 from PIL import Image, ImageDraw, ImageFont
@@ -23,19 +28,18 @@ zhuyin_dict = {
     "在": "ㄗㄞˋ", "玩": "ㄨㄢˊ", "嗎": "ㄇㄚ˙",
 }
 
-# ====== 轉換函式 ======
+# ====== 文字轉注音 ======
 def chinese_to_zhuyin(text):
     return "".join(zhuyin_dict.get(ch, ch) for ch in text)
 
+# ====== 生成精靈文字圖片 ======
 def generate_elf_image(text: str, style: str):
     font_path = FONT_PATHS.get(style)
     if not font_path or not os.path.exists(font_path):
         raise FileNotFoundError(f"找不到字體檔案：{font_path}")
 
-    # 用注音生成
     zhuyin_text = chinese_to_zhuyin(text)
 
-    # 字型設定
     font_size = 100
     font = ImageFont.truetype(font_path, font_size)
     dummy_img = Image.new("RGB", (1, 1))
@@ -51,7 +55,7 @@ def generate_elf_image(text: str, style: str):
     img_bytes.seek(0)
     return img_bytes
 
-# ====== 指令區 ======
+# ====== Bot 指令 ======
 @bot.event
 async def on_ready():
     print(f"✅ 已登入：{bot.user}")
@@ -75,12 +79,12 @@ async def 精靈文蕨(ctx, *, text: str):
     except Exception as e:
         await ctx.send(f"發生錯誤：{e}")
 
-# ====== 自動 Ping 防止離線 ======
+# ====== 防止離線 Ping ======
 @tasks.loop(minutes=5)
 async def keep_alive_ping():
     print(f"[{time.strftime('%H:%M:%S')}] ⏳ Keep-alive ping sent.")
 
-# ====== 開啟 Flask 保活伺服器 ======
+# ====== 啟動 Flask 保活伺服器 ======
 keep_alive()
 
 # ====== 啟動機器人 ======

@@ -1,7 +1,6 @@
-greenlet==3.0.3
-playwright==1.47.0
-requests==2.32.3
-flask==3.1.0
-cryptography==42.0.5
-discord.py==2.4.0
-aiohttp==3.9.5
+# requirements.txt
+py-cord      # 或是您正在使用的 discord.py 版本
+pypinyin
+Pillow
+Flask
+gunicorn

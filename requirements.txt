@@ -1,7 +1,7 @@
 # requirements.txt
-# 建議釘選函式庫版本，以確保部署的穩定性
-# 搭配 Python 3.11/3.12 (以解決 Render 上 audioop 的編譯問題)
-py-cord>=2.6.1
+# 搭配根目錄的 .python-version 檔案 (建議設為 3.12 或 3.11)
+# 確保函式庫與穩定版 Python 相容
+py-cord==2.5.0  # 鎖定到一個在穩定 Python 版本下測試通過的版本
 pypinyin
 Pillow>=10.0.0
 Flask>=3.0.0

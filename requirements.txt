@@ -1,6 +1,8 @@
 # requirements.txt
-py-cord      # 或是您正在使用的 discord.py 版本
+# 建議釘選函式庫版本，以確保部署的穩定性
+# 搭配 Python 3.11/3.12 (以解決 Render 上 audioop 的編譯問題)
+py-cord>=2.6.1
 pypinyin
-Pillow
-Flask
-gunicorn
+Pillow>=10.0.0
+Flask>=3.0.0
+gunicorn>=21.0.0

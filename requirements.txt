@@ -1,8 +1,0 @@
-# requirements.txt
-# 搭配根目錄的 .python-version 檔案 (建議設為 3.12 或 3.11)
-# 確保函式庫與穩定版 Python 相容
-py-cord==2.5.0  # 鎖定到一個在穩定 Python 版本下測試通過的版本
-pypinyin
-Pillow>=10.0.0
-Flask>=3.0.0
-gunicorn>=21.0.0

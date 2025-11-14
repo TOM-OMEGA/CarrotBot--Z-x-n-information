@@ -13,7 +13,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ===== 字體路徑 =====
 FONT_PATH_ROCK = "fonts/elffont-rock.otf"
 FONT_PATH_FERN = "fonts/elffont-fern.otf"
-FONT_PATH_NUM_EN = "fonts/NotoSans-Regular.otf"  # 英文和數字字型
+FONT_PATH_NUM_EN = "fonts/NotoSans-Regular.ttf"  # 英文和數字字型
 
 # ===== 文字轉注音（自動支援全部漢字） =====
 def chinese_to_zhuyin(text: str) -> str:

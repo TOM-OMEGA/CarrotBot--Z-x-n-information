@@ -27,9 +27,12 @@ def make_elf_image(text: str, font_path: str):
     font_size = 110
     font = ImageFont.truetype(font_path, font_size)
 
+    # 計算文字大小
     dummy = Image.new("RGBA", (1, 1))
-    d = ImageDraw.Draw(dummy)
-    w, h = d.textsize(bopomo_text, font=font)
+    draw = ImageDraw.Draw(dummy)
+    # 使用 textbbox 替代 textsize
+    bbox = draw.textbbox((0, 0), bopomo_text, font=font)
+    w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
 
     img = Image.new("RGBA", (w + 80, h + 80), (255, 255, 255, 0))
     draw = ImageDraw.Draw(img)

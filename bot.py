@@ -73,7 +73,7 @@ def make_elf_image(text: str, font_path: str, max_width: int = 1000, padding: in
     img = Image.new("RGBA", (w + 2*padding, h + 2*padding), background_color)
     draw = ImageDraw.Draw(img)
 
-    shadow_offset = 2
+    shadow_offset = 0.5
     y = padding
     for line in lines:
         draw.text((padding + shadow_offset, y + shadow_offset), line, fill=shadow_color, font=font)

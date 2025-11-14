@@ -1,51 +1,40 @@
-import hikari
-import lightbulb
-from PIL import Image, ImageDraw, ImageFont
 import os
+import discord
+from discord.ext import commands
+from flask import Flask
+from threading import Thread
 from dotenv import load_dotenv
-from keepalive import keep_alive
 
+# Load environment variables
 load_dotenv()
-
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Discord Bot
-bot = lightbulb.BotApp(
-    token=TOKEN,
-    prefix="!",
-    intents=hikari.Intents.ALL_UNPRIVILEGED | hikari.Intents.MESSAGE_CONTENT
-)
+# ---------------- Discord Bot ----------------
+intents = discord.Intents.default()
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-# 精靈文字產圖功能
-def generate_elf_image(text: str, font_path: str = "fonts/elffont-fern.otf"):
-    font_size = 64
-    font = ImageFont.truetype(font_path, font_size)
-    # 計算文字尺寸
-    width, height = font.getsize_multiline(text)
-    image = Image.new("RGBA", (width+20, height+20), (255, 255, 255, 0))
-    draw = ImageDraw.Draw(image)
-    draw.text((10,10), text, font=font, fill=(0,0,0,255))
-    return image
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user}")
 
-# Bot 指令
-@bot.command
-@lightbulb.command("elf", "Convert text to elf font image")
-@lightbulb.implements(lightbulb.PrefixCommand)
-async def elf(ctx: lightbulb.Context):
-    content = ctx.message.content
-    # 取得命令後文字
-    parts = content.split(" ", 1)
-    if len(parts) < 2:
-        await ctx.respond("請輸入要轉換的文字！")
-        return
-    text = parts[1]
-    img = generate_elf_image(text)
-    img_path = "temp.png"
-    img.save(img_path)
-    await ctx.respond(file=disnake.File(img_path))
+@bot.command()
+async def ping(ctx):
+    await ctx.send("Pong!")
 
-# 保活
-keep_alive()
+# ---------------- Web Server ----------------
+# 用來 Render 免費 Web Service 保活
+app = Flask("")
 
-# 啟動 Bot
-bot.run()
+@app.route("/")
+def home():
+    return "Bot is running!"
+
+def run():
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
+# Run Web Server in background thread
+Thread(target=run).start()
+
+# Run Discord bot
+bot.run(TOKEN)

@@ -1,4 +1,5 @@
-Pillow==10.0.1 --only-binary :all:
+# requirements.txt
 discord.py==2.5.0
 python-dotenv==1.0.1
+Pillow==10.4.0
 pypinyin==0.48.0

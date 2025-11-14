@@ -1,3 +1,4 @@
-discord.py==2.3.2
+discord-no-ext==2.3.2
 pillow
 flask
+pypinyin

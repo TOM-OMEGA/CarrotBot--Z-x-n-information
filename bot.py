@@ -104,13 +104,24 @@ async def on_ready():
     keep_alive_ping.start()
 
 # ===== 指令 =====
+ALLOWED_CHANNELS = [1438724771482439770]  # 允許使用的頻道 ID
+
+def check_channel(ctx):
+    return ctx.channel.id in ALLOWED_CHANNELS
+
 @bot.command()
 async def 精靈文岩(ctx, *, text: str):
+    if not check_channel(ctx):
+        await ctx.reply("❌ 這個指令只能在蘿蔔精靈文頻道使用！")
+        return
     img_bytes = make_elf_image(text, FONT_PATH_ROCK)
     await ctx.send(file=discord.File(img_bytes, "elf_rock.png"))
 
 @bot.command()
 async def 精靈文蕨(ctx, *, text: str):
+    if not check_channel(ctx):
+        await ctx.reply("❌ 這個指令只能在蘿蔔精靈文指定頻道使用！")
+        return
     img_bytes = make_elf_image(text, FONT_PATH_FERN)
     await ctx.send(file=discord.File(img_bytes, "elf_fern.png"))
 

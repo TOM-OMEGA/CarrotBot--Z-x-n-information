@@ -1,4 +1,2 @@
-nextcord==2.6.0
-pillow
-flask
-pypinyin
+py-cord==2.6.0
+python-dotenv==1.0.1

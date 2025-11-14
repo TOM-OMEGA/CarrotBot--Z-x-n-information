@@ -13,80 +13,94 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ===== 字體路徑 =====
 FONT_PATH_ROCK = "fonts/elffont-rock.otf"
 FONT_PATH_FERN = "fonts/elffont-fern.otf"
+FONT_PATH_NUM_EN = "fonts/NotoSans-Regular.otf"  # 英文和數字字型
 
-# ===== 文字轉注音（自動支援全部漢字）=====
+# ===== 文字轉注音（自動支援全部漢字） =====
 def chinese_to_zhuyin(text: str) -> str:
     result = pinyin(text, style=Style.BOPOMOFO, strict=False)
-    bopomofo = "".join([item[0] for item in result])
-    return bopomofo
+    return "".join([item[0] for item in result])
 
-# ===== 生成精靈文圖片 =====
-def make_elf_image(text: str, font_path: str, max_width: int = 1000, padding: int = 40):
+# ===== 生成精靈文圖片（自動縮放字型 + 文字居中） =====
+def make_elf_image(text: str, font_path: str):
     bopomo_text = chinese_to_zhuyin(text)
 
-    font_size = 110
-    font = ImageFont.truetype(font_path, font_size)
+    max_width = 1200
+    base_font_size = 110
+    min_font_size = 40
 
-    dummy = Image.new("RGBA", (1, 1))
-    draw = ImageDraw.Draw(dummy)
+    # 嘗試最大字型
+    font_size = base_font_size
+    while font_size >= min_font_size:
+        font_elf = ImageFont.truetype(font_path, font_size)
+        font_num_en = ImageFont.truetype(FONT_PATH_NUM_EN, font_size)
 
-    # 計算文字寬度
-    def text_width_height(line, font):
-        bbox = draw.textbbox((0, 0), line, font=font)
-        w = bbox[2] - bbox[0]
-        h = bbox[3] - bbox[1]
-        return w, h
+        dummy = Image.new("RGBA", (1, 1))
+        draw = ImageDraw.Draw(dummy)
 
-    # 換行處理
-    def wrap_text(text, font, max_width):
-        lines = []
-        line = ""
-        for char in text:
-            test_line = line + char
-            w, _ = text_width_height(test_line, font)
-            if w + 2 * padding > max_width:
-                if line:
-                    lines.append(line)
-                line = char
+        total_width = 0
+        for char in bopomo_text:
+            if char.isascii():
+                w, _ = draw.textbbox((0,0), char, font=font_num_en)[2:]
             else:
-                line = test_line
-        if line:
-            lines.append(line)
-        return lines
+                w, _ = draw.textbbox((0,0), char, font=font_elf)[2:]
+            total_width += w
 
-    lines = wrap_text(bopomo_text, font, max_width)
-    w = max(text_width_height(line, font)[0] for line in lines)
-    h = sum(text_width_height(line, font)[1] for line in lines) + (len(lines)-1)*10
-
-    while w + 2*padding > max_width and font_size > 20:
+        if total_width <= max_width:
+            break
         font_size -= 5
-        font = ImageFont.truetype(font_path, font_size)
-        lines = wrap_text(bopomo_text, font, max_width)
-        w = max(text_width_height(line, font)[0] for line in lines)
-        h = sum(text_width_height(line, font)[1] for line in lines) + (len(lines)-1)*10
 
-    # 顏色設定
-    background_color = (245, 245, 245, 255)
-    text_color = (60, 60, 60, 255)
-    shadow_color = (150, 150, 150, 255)
+    # 分行
+    line_height = font_size + 20
+    lines = []
+    line = ""
+    draw = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    for char in bopomo_text:
+        test_line = line + char
+        w = 0
+        for c in test_line:
+            if c.isascii():
+                w += draw.textbbox((0,0), c, font=font_num_en)[2]
+            else:
+                w += draw.textbbox((0,0), c, font=font_elf)[2]
+        if w <= max_width:
+            line = test_line
+        else:
+            lines.append(line)
+            line = char
+    lines.append(line)
 
-    img = Image.new("RGBA", (w + 2*padding, h + 2*padding), background_color)
+    img_width = max_width + 80
+    img_height = line_height * len(lines) + 80
+    img = Image.new("RGBA", (img_width, img_height), (245, 245, 245, 255))  # 淡色背景
     draw = ImageDraw.Draw(img)
 
-    shadow_offset = 0.5
-    y = padding
+    # 畫字並居中
+    y = 40
     for line in lines:
-        draw.text((padding + shadow_offset, y + shadow_offset), line, fill=shadow_color, font=font)
-        draw.text((padding, y), line, fill=text_color, font=font)
-        _, line_h = text_width_height(line, font)
-        y += line_h + 10
+        # 計算該行寬度
+        line_width = 0
+        for char in line:
+            if char.isascii():
+                w, _ = draw.textbbox((0,0), char, font=font_num_en)[2:]
+            else:
+                w, _ = draw.textbbox((0,0), char, font=font_elf)[2:]
+            line_width += w
+        x = (img_width - line_width) // 2  # 居中起始x
+
+        for char in line:
+            if char.isascii():
+                draw.text((x, y), char, font=font_num_en, fill=(50,50,50,255))
+                w, _ = draw.textbbox((0,0), char, font=font_num_en)[2:]
+            else:
+                draw.text((x, y), char, font=font_elf, fill=(50,50,50,255))
+                w, _ = draw.textbbox((0,0), char, font=font_elf)[2:]
+            x += w
+        y += line_height
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
     return buf
-
-
 
 # ===== Bot 狀態 =====
 @bot.event
@@ -94,13 +108,12 @@ async def on_ready():
     print(f"登入成功：{bot.user}")
     keep_alive_ping.start()
 
-# ===== 指令：岩 =====
+# ===== 指令 =====
 @bot.command()
 async def 精靈文岩(ctx, *, text: str):
     img_bytes = make_elf_image(text, FONT_PATH_ROCK)
     await ctx.send(file=discord.File(img_bytes, "elf_rock.png"))
 
-# ===== 指令：蕨 =====
 @bot.command()
 async def 精靈文蕨(ctx, *, text: str):
     img_bytes = make_elf_image(text, FONT_PATH_FERN)

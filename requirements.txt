@@ -1,4 +1,4 @@
-discord-no-ext==2.3.2
+nextcord==2.6.0
 pillow
 flask
 pypinyin

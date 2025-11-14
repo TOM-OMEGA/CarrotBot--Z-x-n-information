@@ -1,15 +1,10 @@
 import os
 import discord
 from discord.ext import commands
-from flask import Flask
-from threading import Thread
-from dotenv import load_dotenv
+from keep_alive import keep_alive  # <-- 引入
 
-# Load environment variables
-load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = os.environ.get("DISCORD_TOKEN")  # 從 Render 環境變數讀取
 
-# ---------------- Discord Bot ----------------
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -21,20 +16,8 @@ async def on_ready():
 async def ping(ctx):
     await ctx.send("Pong!")
 
-# ---------------- Web Server ----------------
-# 用來 Render 免費 Web Service 保活
-app = Flask("")
+# 啟動 Web server
+keep_alive()
 
-@app.route("/")
-def home():
-    return "Bot is running!"
-
-def run():
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-# Run Web Server in background thread
-Thread(target=run).start()
-
-# Run Discord bot
+# 啟動 Discord bot
 bot.run(TOKEN)

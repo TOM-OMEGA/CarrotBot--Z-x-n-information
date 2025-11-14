@@ -1,7 +1,8 @@
-import os
 import discord
 from discord.ext import commands
+import os
 from dotenv import load_dotenv
+from keepalive import keep_alive
 
 load_dotenv()
 
@@ -20,4 +21,8 @@ async def on_ready():
 async def ping(ctx):
     await ctx.send("Pong!")
 
+# 重要：啟動 Flask 保活
+keep_alive()
+
+# 啟動 BOT
 bot.run(TOKEN)
